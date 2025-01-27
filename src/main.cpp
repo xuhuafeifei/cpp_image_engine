@@ -1,6 +1,5 @@
 #include <iostream>
 #include <vector>
-#include "raylib.h"
 #include "render.hpp"
 
 int main(int argc, char **argv)

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "raylib.h"
-#include "glm/glm.hpp"
+//#include "raylib.h"
+//#include "glm/glm.hpp"
+#include "common.h"
 
 const int width = 800;
 const int height = 600;
@@ -9,6 +10,15 @@ const float tMax = 200.0;
 const float tMin = 0.1;
 const int maxMarchTime = 128;
 const float delta = 0.001;
+
+// glm::vec3 light = glm::vec3(-10, 15, 2);
+
+const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
+
+glm::vec3 getCamera()
+{
+    return glm::vec3(0., 0, -1.5);
+}
 
 glm::vec2 fixUV(int x, int y)
 {
@@ -32,9 +42,16 @@ float sdfSphere(glm::vec3 p, glm::vec3 o, float r)
     return glm::length(p - o) - r;
 }
 
-float sdf(glm::vec3 p)
+float sdfGround(glm::vec3 p)
 {
-    return sdfSphere(p, {0, 2, 7}, 2);
+    // 很操蛋, 我的这个y轴是向下为正
+    // 所以这里应该是地面坐标 - p.y
+    return 2 - p.y;
+}
+
+float map(glm::vec3 p)
+{
+    return std::min(sdfSphere(p, {circle.x, circle.y, circle.z}, circle.w), sdfGround(p));
 }
 
 Color fromVec(glm::vec3 v)
@@ -53,7 +70,7 @@ float rayMarch(glm::vec3 ro, glm::vec3 rd)
     for (int i = 0; i < maxMarchTime && t < tMax; i++)
     {
         glm::vec3 p = ro + rd * t;
-        float d = sdf(p);
+        float d = map(p);
         if (d < delta)
             break;
         t += d;
@@ -70,10 +87,10 @@ glm::vec3 calcNormal(glm::vec3 p)
     const glm::vec3 v4(1);
     return glm::normalize(
         glm::vec3(
-            sdf(p + v1 * delta) * v1 +
-            sdf(p + v2 * delta) * v2 +
-            sdf(p + v3 * delta) * v3 +
-            sdf(p + v4 * delta) * v4));
+            map(p + v1 * delta) * v1 +
+            map(p + v2 * delta) * v2 +
+            map(p + v3 * delta) * v3 +
+            map(p + v4 * delta) * v4));
 }
 
 Color render(int x, int y)
@@ -81,9 +98,9 @@ Color render(int x, int y)
     glm::vec2 uv = fixUV(x, y);
 
     glm::vec3 color(0);
-    glm::vec3 ro(0, 0, -1.5);
+    glm::vec3 ro = getCamera();
     glm::vec3 rd = glm::normalize(glm::vec3(uv, 0) - ro);
-    glm::vec3 light = glm::vec3(-10, 15, 7);
+    glm::vec3 light = glm::vec3(10, -15, 7);
 
     float t = rayMarch(ro, rd);
 
@@ -92,9 +109,10 @@ Color render(int x, int y)
         glm::vec3 p = ro + rd * t;
         glm::vec3 n = calcNormal(p);
         float diff = glm::dot(
-            glm::normalize(p - light),
+            glm::normalize(light - p),
             n);
         color = glm::vec3(1) * diff;
+//        color = glm::vec3(1);
     }
     return fromVec(color);
 }
