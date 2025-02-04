@@ -32,14 +32,14 @@ unsigned char convert(float v)
 glm::vec2 sdfSphere(glm::vec3 p, glm::vec3 o, float r)
 {
     // {距离, tag}
-    return {glm::length(p - o) - r, 1};
+    return {glm::length(p - o) - r, 2};
 }
 
 glm::vec2 sdfGround(glm::vec3 p)
 {
     // 很操蛋, 我的这个y轴是向下为正
     // 所以这里应该是地面坐标 - p.y
-    return {- p.y, 2};
+    return {- p.y, 1};
 }
 
 glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
@@ -53,7 +53,8 @@ glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
 glm::vec2 map(glm::vec3 p)
 {
     auto s = sdfSphere(p, {circle.x, circle.y, circle.z}, circle.w);
-    return vec2Min(s, sdfGround(p));
+    return s;
+    // return vec2Min(s, sdfGround(p));
 }
 
 Color fromVec(glm::vec3 v)
@@ -82,9 +83,20 @@ float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float k )
 
 glm::vec2 rayMarch(glm::vec3 ro, glm::vec3 rd)
 {
-    float t = 0;
+    float t = 0.1;
+    float tmax = 40.;
+    glm::vec2 res(-1.);
+    // 如果光线方向为正(我的y轴正方向朝下的, md), 那么他一定会与地面相交(没hit other object)的情况下
+    // 此时可以手动计算走过多少轮会与地面相交
+    if (rd.y >= 0.) {
+        float tp = std::abs(ro.y / rd.y);
+        tmax = std::min(tp, tmax);
+        // 地面flag为1
+        // 必须设置为tp, 否则无法渲染阴影
+        res = {tp, 1};
+    }
 
-    for (int i = 0; i < maxMarchTime && t < tMax; i++)
+    for (int i = 0; i < maxMarchTime && t < tmax; i++)
     {
         glm::vec3 p = ro + rd * t;
         auto m = map(p);
@@ -95,7 +107,7 @@ glm::vec2 rayMarch(glm::vec3 ro, glm::vec3 rd)
         t += d;
     }
 
-    return {t, -1};
+    return res;
 }
 
 glm::vec3 calcNormal(glm::vec3 p)
@@ -132,14 +144,14 @@ Color render(int x, int y)
     auto ray = cam.ray(uv);
     glm::vec3 light = glm::vec3(10, -15, 7);
 
-    auto rm = rayMarch(ray.ro, ray.rd);
+    auto rm = rayMarch(ray.ro, glm::normalize(ray.rd));
 
     // rm.y = -1时, 表示没有hit object
     if (rm.y > 0)
     {
         auto t = rm.x;
         glm::vec3 p = ray.at(t);
-        glm::vec3 n = calcNormal(p);
+        glm::vec3 n = (rm.y < 1.1) ? glm::vec3(0, -1, 0) : calcNormal(p);
         float diff = glm::dot(
             glm::normalize(light - p),
             n);
@@ -151,9 +163,10 @@ Color render(int x, int y)
         // color = glm::vec3(1) * diff + amb * glm::vec3(0.5);
         float amb = 0.1;
         color = glm::vec3(1) * diff + amb;
-        if (rm.y == 1) {
+        if (std::abs(rm.y - 1) < 0.1) {
             color += glm::vec3(1, 0, 0);
-        } else if (rm.y == 2) {
+        }
+        else if (std::abs(rm.y - 2) < 0.1) {
             color += glm::vec3(0, 0, 1);
         }
     }

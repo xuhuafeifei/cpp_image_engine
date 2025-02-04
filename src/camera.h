@@ -26,11 +26,10 @@ class camera {
 public:
     camera() {
         this->y_offset = -2.;
-        ro = glm::vec3(0., 0. + y_offset, -1.5);
+        ro = glm::vec3(0., 0. + y_offset, -0.5);
     }
 
     ray ray(glm::vec2 uv) {
-        //
         glm::vec3 rd = glm::normalize(glm::vec3(uv + glm::vec2(0, 0. + this->y_offset), 0) - ro);
         return {ro, rd};
     }
