@@ -61,6 +61,21 @@ Color fromVec(glm::vec3 v)
         255};
 }
 
+float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float k )
+{
+    float res = 1.0;
+    float t = mint;
+    for( int i=0; i<256 && t<maxt; i++ )
+    {
+        float h = map(ro + rd*t);
+        if( h<0.001 )
+            return 0.0;
+        res = std::min( res, k*h/t );
+        t += h;
+    }
+    return res;
+}
+
 float rayMarch(glm::vec3 ro, glm::vec3 rd)
 {
     float t = tMin;
@@ -91,6 +106,16 @@ glm::vec3 calcNormal(glm::vec3 p)
             map(p + v4 * delta) * v4));
 }
 
+float normalShadow(glm::vec3 p, glm::vec3 light)
+{
+    float t = rayMarch(p, glm::normalize(light - p));
+    if (t < tMax)
+    {
+        return 0.1;
+    }
+    return 1;
+}
+
 Color render(int x, int y)
 {
     glm::vec2 uv = fixUV(x, y);
@@ -109,7 +134,14 @@ Color render(int x, int y)
         float diff = glm::dot(
             glm::normalize(light - p),
             n);
-        color = glm::vec3(1) * diff;
+        // 绘制阴影
+        // diff *= normalShadow(p, light);
+        diff *= softshadow(p, glm::normalize(light - p), 0.1, 100, 5);
+        // 增加环境光
+        // float amb = 0.5 + 0.5 * dot(n, glm::vec3(0, 1, 0));
+        // color = glm::vec3(1) * diff + amb * glm::vec3(0.5);
+        float amb = 0.1;
+        color = glm::vec3(1) * diff + amb;
     }
     return fromVec(color);
 }
