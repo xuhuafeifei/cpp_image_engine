@@ -11,6 +11,7 @@ const int maxMarchTime = 128;
 const float delta = 0.001;
 
 const glm::vec4 circle = glm::vec4({0, -2, 7, 2});
+const glm::vec3 cir = {circle.x, circle.y, circle.z};
 
 glm::vec2 fixUV(int x, int y)
 {
@@ -53,10 +54,40 @@ float sdBox(glm::vec3 p, glm::vec3 b, glm::vec3 center)
     return mm::length(mm::max(q, glm::vec3(0.0) )) + mm::min(mm::max(q.x, mm::max(q.y,q.z)),0.0);
 }
 
+float sdBoxRound(glm::vec3 p, glm::vec3 b, glm::vec3 center, float rad) {
+    auto q = glm::abs(p - center) - b;
+    return mm::length(mm::max(q, glm::vec3(0.0) )) + mm::min(mm::max(q.x, mm::max(q.y,q.z)),0.0) - rad;
+}
+
 float sdBox( glm::vec3 p, glm::vec3 b )
 {
     auto q = glm::abs(p) - b;
     return mm::length(mm::max(q, glm::vec3(0.0) )) + mm::min(mm::max(q.x, mm::max(q.y,q.z)),0.0);
+}
+
+float shape1(glm::vec3 p)
+{
+    // union
+    auto d = sdfSphere(p, cir, circle.w);
+    d = std::min(sdBox(p, {1,1,1}, {0, -4, 7}), d);
+    return d;
+}
+
+float shape2(glm::vec3 p)
+{
+    // intersection
+    auto d = sdfSphere(p, {5, -3, 6}, 1);
+    d = std::max(sdBox(p, {.5,5,.5}, {5, -3.5, 6}), d);
+    return d;
+}
+
+float shape3(glm::vec3 p)
+{
+    // difference
+    auto d1 = sdfSphere(p, {-5, -3, 6}, 2);
+    auto d2 = sdBox(p, {1,1,2}, {-5, -3, 6});
+    auto d = std::max(d2 , -1 * d1);
+    return d;
 }
 
 glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
@@ -69,9 +100,11 @@ glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
 
 glm::vec2 map(glm::vec3 p)
 {
-    auto s = glm::vec2(sdfSphere(p, {circle.x, circle.y, circle.z}, circle.w), 2);
-    auto b = glm::vec2(sdBox(p, {1, 3, 1}, {4, -3, 6}), 3);
-    return vec2Min(s, b);
+    auto d = glm::vec2(shape1(p), 2);
+    d = vec2Min(d, {shape2(p), 3});
+    d = vec2Min(d, {shape3(p), 4});
+    // d = vec2Min(d, {sdBox(p, {1,1,1}, {3, 0, 7}), 3});
+    return d;
 }
 
 Color fromVec(glm::vec3 v)
@@ -184,7 +217,7 @@ Color render(int x, int y)
     glm::vec3 color = bg - glm::normalize(uv).y * glm::vec3(0.13);
     camera cam;
     auto ray = cam.ray(uv);
-    glm::vec3 light = glm::vec3(10, -15, 7);
+    glm::vec3 light = glm::vec3(10, -15, -5);
 
     auto rm = rayMarch(ray.ro, glm::normalize(ray.rd));
 
@@ -210,7 +243,10 @@ Color render(int x, int y)
         }
         else if (std::abs(rm.y - 3) < 0.1) {
             // 绿色
-            color += glm::vec3(0, 1, 0);
+            color += glm::vec3(0.3, 0.3, 0.3);
+        }
+        else if (std::abs(rm.y - 4) < 0.1) {
+            color += glm::vec3(.6, 1, .2);
         }
     }
     return fromVec(color);
