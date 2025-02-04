@@ -10,13 +10,7 @@ const float tMin = 0.1;
 const int maxMarchTime = 128;
 const float delta = 0.001;
 
-const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
-
-glm::vec3 getCamera()
-{
-
-    return glm::vec3(0., 0, -1.5);
-}
+const glm::vec4 circle = glm::vec4({0, -2, 7, 2});
 
 glm::vec2 fixUV(int x, int y)
 {
@@ -44,7 +38,7 @@ float sdfGround(glm::vec3 p)
 {
     // 很操蛋, 我的这个y轴是向下为正
     // 所以这里应该是地面坐标 - p.y
-    return 2 - p.y;
+    return - p.y;
 }
 
 float map(glm::vec3 p)

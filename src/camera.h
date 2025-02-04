@@ -25,15 +25,19 @@ public:
 class camera {
 public:
     camera() {
-        ro = glm::vec3(0., 0, -1.5);
+        this->y_offset = -2.;
+        ro = glm::vec3(0., 0. + y_offset, -1.5);
     }
 
     ray ray(glm::vec2 uv) {
-        glm::vec3 rd = glm::normalize(glm::vec3(uv, 0) - ro);
+        //
+        glm::vec3 rd = glm::normalize(glm::vec3(uv + glm::vec2(0, 0. + this->y_offset), 0) - ro);
         return {ro, rd};
     }
 private:
     glm::vec3 ro;
+    // 控制镜头的垂直位置
+    float y_offset;
 };
 
 #endif //RMRENDERER_CAMERA_H
