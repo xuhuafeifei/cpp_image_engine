@@ -14,6 +14,7 @@ const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
 
 glm::vec3 getCamera()
 {
+
     return glm::vec3(0., 0, -1.5);
 }
 
