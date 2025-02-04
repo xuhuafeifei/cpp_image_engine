@@ -1,8 +1,7 @@
 #pragma once
 
-//#include "raylib.h"
-//#include "glm/glm.hpp"
 #include "common.h"
+#include "camera.h"
 
 const int width = 800;
 const int height = 600;
@@ -10,8 +9,6 @@ const float tMax = 200.0;
 const float tMin = 0.1;
 const int maxMarchTime = 128;
 const float delta = 0.001;
-
-// glm::vec3 light = glm::vec3(-10, 15, 2);
 
 const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
 
@@ -98,21 +95,20 @@ Color render(int x, int y)
     glm::vec2 uv = fixUV(x, y);
 
     glm::vec3 color(0);
-    glm::vec3 ro = getCamera();
-    glm::vec3 rd = glm::normalize(glm::vec3(uv, 0) - ro);
+    camera cam;
+    auto ray = cam.ray(uv);
     glm::vec3 light = glm::vec3(10, -15, 7);
 
-    float t = rayMarch(ro, rd);
+    float t = rayMarch(ray.ro, ray.rd);
 
     if (t < tMax)
     {
-        glm::vec3 p = ro + rd * t;
+        glm::vec3 p = ray.at(t);
         glm::vec3 n = calcNormal(p);
         float diff = glm::dot(
             glm::normalize(light - p),
             n);
         color = glm::vec3(1) * diff;
-//        color = glm::vec3(1);
     }
     return fromVec(color);
 }
