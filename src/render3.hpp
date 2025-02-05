@@ -45,6 +45,11 @@ float sdfGround(glm::vec3 p)
     return 2 - p.y;
 }
 
+float random(float x)
+{
+    return glm::fract(23345.6754 * sin(x));
+}
+
 float ground(glm::vec3 p)
 {
     return 2 * sin(p.x) * sin(p.y);
