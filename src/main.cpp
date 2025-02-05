@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
-#include "render.hpp"
+//#include "render.hpp"
+#include "render2.hpp"
 
 int main(int argc, char **argv)
 {

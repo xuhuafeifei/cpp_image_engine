@@ -27,7 +27,7 @@ public:
     camera() {
         this->y_offset = -2.;
         this->x_offset = 0;
-        ro = glm::vec3(0. + x_offset, 0. + y_offset, -0.8);
+        ro = glm::vec3(0. + x_offset, 0. + y_offset, -1.0);
     }
 
     ray ray(glm::vec2 uv) {

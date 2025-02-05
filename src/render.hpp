@@ -90,10 +90,21 @@ float shape3(glm::vec3 p)
     return d;
 }
 
+// quadratic polynomial
+float smin( float a, float b, float k )
+{
+    float h = glm::clamp(0.5 + 0.5 * (b - a) / k, 0., 1.);
+    return glm::mix(b, a, h) - k * h * (1. - h);
+}
+
 glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
-    if (a.x <= b.x) {
+    if (a.x <= b.x)
+//    if (smin(a.x, b.x, 1.5))
+    {
         return a;
-    } else {
+    }
+    else
+    {
         return b;
     }
 }
