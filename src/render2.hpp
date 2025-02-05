@@ -187,6 +187,9 @@ float smooth_func(float f)
     return  a * a * f + c;
 }
 
+/**
+ * 分段函数
+ */
 float seg_water_ground_func(float y, float p)
 {
     float res;
