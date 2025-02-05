@@ -179,11 +179,37 @@ glm::vec3 sky_draw(glm::vec3 rd)
 /**
  * 二次函数
  */
-float smooth_func(float f) {
+float smooth_func(float f)
+{
     // a控制锐边程度, a越大, 锐边越明显
-    const float a = 0.6f;
+    const float a = 0.42f;
     const float c = 0.f;
     return  a * a * f + c;
+}
+
+float seg_water_ground_func(float y, float p)
+{
+    float res;
+    float c = 0.2;
+    if (y < p)
+    {
+        res = c / (1 + p - y);
+    }
+    else
+    {
+        // exp用于控制海面颜色, exp越大, 海面越深
+        float exp = 0.95;
+        res = glm::pow(y - p, exp) + c;
+    }
+    return res;
+}
+
+/**
+ * 增加海平面
+ */
+float water_ground(float y)
+{
+    return  - seg_water_ground_func(y, 0.25);
 }
 
 glm::vec3 sky_draw_my(glm::vec2 uv)
@@ -197,9 +223,9 @@ glm::vec3 sky_draw_my(glm::vec2 uv)
     float dist = glm::length(sun - uv);
     // 距离越小, 越亮
     // 通过pow函数, 让反比例函数迅速衰减, 大的值迅速膨胀, 小的值迅速衰减, 抑制太阳光晕
-    // alpha控制衰减速率
-    float alpha = 1.2;
-    glm::vec3 sunLight = glm::vec3(glm::pow(1 / (dist + alpha), 2));
+    // alpha控制衰减速率. alpha越小, 越亮
+    float alpha = 1.1;
+    glm::vec3 sunLight = glm::vec3(glm::pow(1 / (dist + 1 * alpha), 2));
     // 增加渐变(中间亮, 上下暗)
     color = color + glm::vec3(sunLight);
     // 增加环境光(整体调暗)
@@ -207,6 +233,7 @@ glm::vec3 sky_draw_my(glm::vec2 uv)
     // 增加y轴渐变
     auto c = smooth_func(y);
     color = color - c;
+    color += water_ground(uv.y);
     return color;
 }
 
