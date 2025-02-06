@@ -95,7 +95,16 @@ float func(float x)
     return 0.25f * sin((PI *  4) * x);
 }
 
-float funcPlot(glm::vec2 uv)
+float plotFunc1(glm::vec2 uv, int x)
+{
+    float f = 0.;
+    auto fx = fixUV(x, 0.).x;
+    auto nfx = fixUV(x + 1., 0.).x;
+    f += segment(uv, glm::vec2(fx, func(fx)), glm::vec2(nfx, func(nfx)), 0.01);
+    return f;
+}
+
+float plotFunc2(glm::vec2 uv, int x)
 {
     float f = 0.;
     // 判断uv到整个范围内的所有线段的距离
@@ -107,6 +116,11 @@ float funcPlot(glm::vec2 uv)
     }
     // 累加, 放置出现超过1的情况
     return glm::clamp(f, 0.f, 1.f);
+}
+
+float funcPlot(glm::vec2 uv, int x)
+{
+    return plotFunc1(uv, x);
 }
 
 float map(glm::vec3 p)
@@ -158,7 +172,7 @@ Color render(int x, int y)
     glm::vec2 uv = fixUV(x, y);
 
     // auto color = glm::vec3(segment(uv, glm::vec2(0, 0), glm::vec2(2, 2), 0.5));
-    auto color = glm::vec3(funcPlot(uv));
+    auto color = glm::vec3(funcPlot(uv, x));
 
     return fromVec(color);
 }
