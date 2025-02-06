@@ -1,3 +1,6 @@
+/**
+ * 绘制随即地形
+ */
 #pragma once
 
 #include "common.h"
@@ -45,11 +48,6 @@ float sdfGround(glm::vec3 p)
     return 2 - p.y;
 }
 
-float random(float x)
-{
-    return glm::fract(23345.6754 * sin(x));
-}
-
 float ground(glm::vec3 p)
 {
     return 2 * sin(p.x) * sin(p.y);
@@ -90,10 +88,16 @@ float segment(glm::vec2 p, glm::vec2 a, glm::vec2 b, float w)
     return 0.;
 }
 
+float random(float x)
+{
+    return glm::fract(23345.6754 * sin(x * 2.3));
+}
+
 float func(float x)
 {
-//    return 0.25f * sin((PI *  4) * x);
-    return 0.75 * glm::smoothstep(0.f, 1.f, x) - 0.25;
+    float i = glm::floor(x);
+    float u = glm::fract(x);
+    return u;
 }
 
 float plotFunc1(glm::vec2 uv, int x)
@@ -121,7 +125,7 @@ float plotFunc2(glm::vec2 uv, int x)
 
 float funcPlot(glm::vec2 uv, int x)
 {
-    return plotFunc1(uv, x);
+    return plotFunc2(uv, x);
 }
 
 float map(glm::vec3 p)
