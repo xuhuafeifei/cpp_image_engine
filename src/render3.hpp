@@ -61,14 +61,36 @@ float random(float x)
     return glm::fract(23345.6754 * sin(x));
 }
 
+float random(glm::vec2 pos)
+{
+
+    auto f = 5820.34280 * sin(glm::dot(pos, glm::vec2(24.432, 409.43)));
+    f = glm::fract(f);
+    return glm::abs(f);
+}
+
+float noise(glm::vec2 pos)
+{
+    auto i = glm::floor(pos);
+    auto f = glm::fract(pos);
+    auto u = f * f * (glm::vec2(3.0) - glm::vec2(2.0) * f);
+
+    auto a = random(i);
+    auto b = random(i + glm::vec2(1, 0));
+    auto c = random(i + glm::vec2(0, 1));
+    auto d = random(i + glm::vec2(1, 1));
+
+    return glm::mix(a, b, u.x) + (c - a) * u.y * (1.f - u.x) + (d - b) * u.x * u.y;
+}
+
 float ground(glm::vec3 p)
 {
-    return 2 * sin(p.x) * sin(p.y);
+    return noise(p);
 }
 
 float map(glm::vec3 p)
 {
-    return ground({p.x, p.z, 0}) - p.y;
+    return 3. * ground({p.x, p.z, 0}) - p.y;
 }
 
 Color fromVec(glm::vec3 v)

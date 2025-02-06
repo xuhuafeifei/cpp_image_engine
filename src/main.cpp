@@ -2,8 +2,9 @@
 #include <vector>
 //#include "render.hpp"
 //#include "render2.hpp"
-#include "render4.hpp"
+//#include "render4.hpp"
 //#include "render5.hpp"
+#include "render3.hpp"
 
 int main(int argc, char **argv)
 {
