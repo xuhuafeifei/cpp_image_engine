@@ -1,3 +1,6 @@
+/**
+ * 绘制基本图形
+ */
 #pragma once
 
 #include "common.h"

@@ -2,6 +2,9 @@
 // Created by 25080 on 2025/2/4.
 //
 
+/**
+ * 绘制天空
+ */
 #ifndef RMRENDERER_RENDER2_H
 #define RMRENDERER_RENDER2_H
 

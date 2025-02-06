@@ -3,7 +3,7 @@
 //
 
 /**
- * 绘制规则地面
+ * 绘制随机地面
  */
 
 #ifndef RMRENDERER_RENDER3_H
@@ -12,6 +12,7 @@
 #pragma once
 
 #include "common.h"
+#include "camera2.h"
 
 const int width = 800;
 const int height = 600;
@@ -21,10 +22,11 @@ const int maxMarchTime = 128;
 const float delta = 0.001;
 
 const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
+const float y_offset = 0.2;
 
 glm::vec3 getCamera()
 {
-    return glm::vec3(0., -5, -1.);
+    return glm::vec3(0., 0 - y_offset, 0);
 }
 
 glm::vec2 fixUV(int x, int y)
@@ -61,36 +63,83 @@ float random(float x)
     return glm::fract(23345.6754 * sin(x));
 }
 
+/**
+ * 原本的sin函数会生成无理数, 在某些情况下会不连续
+ */
+float hash12(glm::vec2 p)
+{
+    glm::vec3 p3 = glm::fract(glm::vec3(p.x, p.y, 0) * glm::vec3(.1031));
+    p3 += glm::dot(p3, glm::vec3(p3.y, p3.z, p3.x) + glm::vec3(33.33));
+    return glm::fract((p3.x + p3.y) * p3.z);
+}
+
 float random(glm::vec2 pos)
 {
 
+    /*
     auto f = 5820.34280 * sin(glm::dot(pos, glm::vec2(24.432, 409.43)));
     f = glm::fract(f);
     return glm::abs(f);
+     */
+    return hash12(pos);
 }
 
-float noise(glm::vec2 pos)
+glm::vec3 noise(glm::vec2 pos)
 {
     auto i = glm::floor(pos);
     auto f = glm::fract(pos);
-    auto u = f * f * (glm::vec2(3.0) - glm::vec2(2.0) * f);
+    // auto u = f * f * (glm::vec2(3.0) - glm::vec2(2.0) * f);
+    auto u = glm::smoothstep(0.f, 1.f, f);
+    auto du = glm::vec2(6.) * u * (glm::vec2(1.) - u);
 
     auto a = random(i);
     auto b = random(i + glm::vec2(1, 0));
     auto c = random(i + glm::vec2(0, 1));
     auto d = random(i + glm::vec2(1, 1));
 
-    return glm::mix(a, b, u.x) + (c - a) * u.y * (1.f - u.x) + (d - b) * u.x * u.y;
+//    return glm::mix(a, b, u.x) + (c - a) * u.y * (1.f - u.x) + (d - b) * u.x * u.y;
+    return glm::vec3(
+            a + (b - a) * u.x * (1. - u.y) + (c - a) * (1. - u.x) * u.y + (d - a) * u.x * u.y,
+            du * (glm::vec2(b - a, c - a) + (a - b - c + d) * glm::vec2(u.y, u.x))
+    );
 }
+
+glm::mat2 mat = glm::mat2(.6, -0.8, 0.8, 0.6);
 
 float ground(glm::vec3 p)
 {
-    return noise(p);
+    float a = 0.;
+    float b = 1.;
+    glm::vec2 d = glm::vec2(0);
+
+    for (int i = 0; i < 5; ++i)
+    {
+        auto n = noise(p);
+        d += glm::vec2(n.y, n.z);
+        a += b * n.x / (1. + glm::dot(d, d));
+        glm::vec2 p2(p.x, p.y);
+        p2 = mat * p2 * glm::vec2(2.);
+        p.x = p2.x;
+        p.y = p2.y;
+        b *= 0.5;
+        /*
+        // a += noise(p).x;
+        // 将 glm::vec3 转换为 glm::vec2
+        glm::vec2 p2(p.x, p.y);
+        // 使用矩阵与向量的乘法
+        p2 = mat * p2;
+        // 将变换后的结果重新赋值给 p 的 x 和 y 分量
+        p.x = p2.x;
+        p.y = p2.y;
+         */
+    }
+
+    return a;
 }
 
 float map(glm::vec3 p)
 {
-    return 3. * ground({p.x, p.z, 0}) - p.y;
+    return ground({p.x, p.z, 0}) - p.y;
 }
 
 Color fromVec(glm::vec3 v)
@@ -136,10 +185,20 @@ Color render(int x, int y)
 {
     glm::vec2 uv = fixUV(x, y);
 
+    // set camera
+    auto target = glm::vec3(0, 0, 0);
+    float camHight = -2.;
+    float camRad = 1.5;
+    auto camLoc = glm::vec3 (camRad, camHight, camRad);
+    auto camMat = camera(target, camLoc, 0.);
+
     glm::vec3 color(0);
-    glm::vec3 ro = getCamera();
-    glm::vec3 rd = glm::normalize(glm::vec3(uv.x, uv.y - 5, 0) - ro);
     glm::vec3 light = glm::vec3(10, -15, 7);
+
+    auto ray = camMat.getRay(uv);
+
+    auto ro = ray.ro;
+    auto rd = ray.rd;
 
     float t = rayMarch(ro, rd);
 
