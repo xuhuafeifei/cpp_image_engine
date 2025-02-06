@@ -13,7 +13,7 @@ const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
 
 glm::vec3 getCamera()
 {
-    return glm::vec3(0., -5, -1.);
+    return glm::vec3(0., 0, 0);
 }
 
 glm::vec2 fixUV(int x, int y)
@@ -55,9 +55,63 @@ float ground(glm::vec3 p)
     return 2 * sin(p.x) * sin(p.y);
 }
 
+/**
+ * 绘制直线
+ */
+float segment(glm::vec3 p, glm::vec3 a, glm::vec3 b, float w)
+{
+    auto ap = p - a;
+    auto ab = b - a;
+    auto cos_theta = glm::abs(glm::dot(ap, ab)) / glm::abs(glm::dot(ap, ap));
+    auto aq_length = glm::length(ap) * cos_theta;
+    auto aq = ab * glm::vec3(aq_length);
+    // 点到直线的距离
+    auto dist = glm::length(aq - ap);
+    // 点在线上
+    if (dist <= w) {
+        return 1.;
+    }
+    return 0.;
+}
+
+float segment(glm::vec2 p, glm::vec2 a, glm::vec2 b, float w)
+{
+    auto ap = p - a;
+    auto ab = b - a;
+    auto cos_theta = glm::dot(ap, ab) / glm::dot(ap, ap);
+    auto aq_length = glm::length(ab) * cos_theta;
+    auto aq = ab * glm::vec2(aq_length);
+    // 点到直线的距离
+    auto dist = glm::length(aq - ap);
+    // 点在线上
+    if (dist < w) {
+        return 1.;
+    }
+    return 0.;
+}
+
+float func(float x)
+{
+    return 0.25f * sin((PI *  4) * x);
+}
+
+float funcPlot(glm::vec2 uv)
+{
+    float f = 0.;
+    // 判断uv到整个范围内的所有线段的距离
+    for (float x = 0.; x <= width; x += 1.)
+    {
+        auto fx = fixUV(x, 0.).x;
+        auto nfx = fixUV(x + 1., 0.).x;
+        f += segment(uv, glm::vec2(fx, func(fx)), glm::vec2(nfx, func(nfx)), 0.01);
+    }
+    // 累加, 放置出现超过1的情况
+    return glm::clamp(f, 0.f, 1.f);
+}
+
 float map(glm::vec3 p)
 {
-    return ground({p.x, p.z, 0}) - p.y;
+    return func(p.x) - p.y;
 }
 
 Color fromVec(glm::vec3 v)
@@ -79,7 +133,7 @@ float rayMarch(glm::vec3 ro, glm::vec3 rd)
         float d = map(p);
         if (d < delta)
             break;
-        t += .2f * d;
+        t += d;
     }
 
     return t;
@@ -103,21 +157,8 @@ Color render(int x, int y)
 {
     glm::vec2 uv = fixUV(x, y);
 
-    glm::vec3 color(0);
-    glm::vec3 ro = getCamera();
-    glm::vec3 rd = glm::normalize(glm::vec3(uv.x, uv.y - 5, 0) - ro);
-    glm::vec3 light = glm::vec3(10, -15, 7);
+    // auto color = glm::vec3(segment(uv, glm::vec2(0, 0), glm::vec2(2, 2), 0.5));
+    auto color = glm::vec3(funcPlot(uv));
 
-    float t = rayMarch(ro, rd);
-
-    if (t < tMax)
-    {
-        glm::vec3 p = ro + rd * t;
-        glm::vec3 n = calcNormal(p);
-        float diff = glm::dot(
-                glm::normalize(light - p),
-                n);
-        color = glm::vec3(1) * diff;
-    }
     return fromVec(color);
 }
