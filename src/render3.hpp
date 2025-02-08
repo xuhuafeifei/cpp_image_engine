@@ -106,13 +106,15 @@ glm::vec3 noise(glm::vec2 pos)
 
 glm::mat2 mat = glm::mat2(.6, -0.8, 0.8, 0.6);
 
-float ground(glm::vec3 p)
+float ground(glm::vec3 x)
 {
+    auto p = glm::vec3(0.005) * x;
+//    auto p = x;
     float a = 0.;
     float b = 1.;
     glm::vec2 d = glm::vec2(0);
 
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < 8; ++i)
     {
         auto n = noise(p);
         d += glm::vec2(n.y, n.z);
@@ -134,12 +136,63 @@ float ground(glm::vec3 p)
          */
     }
 
-    return a;
+    return 120 * a;
+}
+
+float ground(glm::vec2 x)
+{
+    auto p = glm::vec2(0.008) * x;
+    float a = 0.;
+    float b = 1.;
+    glm::vec2 d = glm::vec2(0);
+
+    for (int i = 0; i < 8; ++i)
+    {
+        auto n = noise(x);
+        d += glm::vec2(n.y, n.z);
+        a += b * n.x / (1. + glm::dot(d, d));
+        glm::vec2 p2(p.x, p.y);
+        p2 = mat * p2 * glm::vec2(2.);
+        p.x = p2.x;
+        p.y = p2.y;
+        b *= 0.5;
+    }
+
+    return 120 * a;
+}
+
+float groundH(glm::vec2 x)
+{
+    glm::vec2 p = glm::vec2(0.005) * x;
+    auto a = 0.;
+    auto b = 1.;
+    glm::vec2 d = glm::vec2(0);
+
+    for (int i = 0; i < 16; ++i)
+    {
+        glm::vec3 n = noise(p);
+        d += glm::vec2(n.y, n.z);
+        a += b * n.x / (1. + glm::dot(d, d));
+        p = mat * p * glm::vec2(2.);
+        b *= 0.5;
+    }
+
+    return 120 * a;
+}
+
+float groundH(glm::vec3 x)
+{
+    return groundH({x.x, x.y});
 }
 
 float map(glm::vec3 p)
 {
-    return ground({p.x, p.z, 0}) - p.y;
+    return groundH({p.x, p.z, 0}) - p.y;
+}
+
+float mapGround(glm::vec2 p)
+{
+    return groundH({p.x, p.y}) - p.y;
 }
 
 Color fromVec(glm::vec3 v)
@@ -159,7 +212,7 @@ float rayMarch(glm::vec3 ro, glm::vec3 rd)
     {
         glm::vec3 p = ro + rd * t;
         float d = map(p);
-        if (d < delta)
+        if (d < delta * t)
             break;
         t += .2f * d;
     }
@@ -181,13 +234,25 @@ glm::vec3 calcNormal(glm::vec3 p)
                     map(p + v4 * delta) * v4));
 }
 
+glm::vec3 calcNormalGround(glm::vec3 p)
+{
+    glm::vec2 e = glm::vec2(1e-5, 0);
+    return glm::normalize(
+            glm::vec3(
+                    mapGround({p.x + e.x, p.z + e.y}) - mapGround({p.x - e.x, p.z - e.y}),
+                    -2.0 * e.x,
+                    mapGround({p.x + e.y, p.z + e.x}) - mapGround({p.x - e.y, p.z - e.x})
+                    )
+            );
+}
+
 Color render(int x, int y)
 {
     glm::vec2 uv = fixUV(x, y);
 
     // set camera
     auto target = glm::vec3(0, 0, 0);
-    float camHight = -2.;
+    float camHight = -1.5;
     float camRad = 1.5;
     auto camLoc = glm::vec3 (camRad, camHight, camRad);
     auto camMat = camera(target, camLoc, 0.);
@@ -205,7 +270,7 @@ Color render(int x, int y)
     if (t < tMax)
     {
         glm::vec3 p = ro + rd * t;
-        glm::vec3 n = calcNormal(p);
+        glm::vec3 n = calcNormalGround(p);
         float diff = glm::dot(
                 glm::normalize(light - p),
                 n);
