@@ -14,11 +14,13 @@
 #include "common.h"
 #include "camera2.h"
 
+#define GROUND_TIME 14
+
 const int width = 800;
 const int height = 600;
-const float tMax = 200.0;
+const float tMax = 200.0 / 2;
 const float tMin = 0.1;
-const int maxMarchTime = 128;
+const int maxMarchTime = (128 / 2);
 const float delta = 0.001;
 
 const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
@@ -168,7 +170,7 @@ float groundH(glm::vec2 x)
     auto b = 1.;
     glm::vec2 d = glm::vec2(0);
 
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < GROUND_TIME; ++i)
     {
         glm::vec3 n = noise(p);
         d += glm::vec2(n.y, n.z);
@@ -177,7 +179,7 @@ float groundH(glm::vec2 x)
         b *= 0.5;
     }
 
-    return 120 * a;
+    return 80 * a;
 }
 
 float groundH(glm::vec3 x)
@@ -208,13 +210,13 @@ float rayMarch(glm::vec3 ro, glm::vec3 rd)
 {
     float t = tMin;
 
-    for (int i = 0; i < maxMarchTime * 3 && t < tMax; i++)
+    for (int i = 0; i < maxMarchTime && t < tMax; i++)
     {
         glm::vec3 p = ro + rd * t;
         float d = map(p);
         if (d < delta * t)
             break;
-        t += .2f * d;
+        t += .4f * d;
     }
 
     return t;
@@ -239,11 +241,116 @@ glm::vec3 calcNormalGround(glm::vec3 p)
     glm::vec2 e = glm::vec2(1e-5, 0);
     return glm::normalize(
             glm::vec3(
-                    mapGround({p.x + e.x, p.z + e.y}) - mapGround({p.x - e.x, p.z - e.y}),
+                    mapGround({p.x - e.x, p.z - e.y}) - mapGround({p.x + e.x, p.z + e.y}),
                     -2.0 * e.x,
-                    mapGround({p.x + e.y, p.z + e.x}) - mapGround({p.x - e.y, p.z - e.x})
+                    mapGround({p.x - e.y, p.z - e.x}) - mapGround({p.x + e.y, p.z + e.x})
                     )
             );
+}
+
+/**
+ * 二次函数
+ */
+float smooth_func(float f)
+{
+    // a控制锐边程度, a越大, 锐边越明显
+    const float a = 0.42f;
+    const float c = 0.f;
+    return  a * a * f + c;
+}
+
+/**
+ * 分段函数
+ */
+float seg_water_ground_func(float y, float p)
+{
+    float res;
+    float c = 0.2;
+    if (y < p)
+    {
+        res = c / (1 + p - y);
+    }
+    else
+    {
+        // exp用于控制海面颜色, exp越大, 海面越深
+        float exp = 10;
+        res = glm::pow(y - p, exp) + c;
+    }
+    return res;
+}
+
+/**
+ * 增加海平面
+ */
+float water_ground(float y)
+{
+    return  seg_water_ground_func(y, 0.25);
+}
+
+glm::vec3 sky_draw_my(glm::vec2 uv)
+{
+    float y = glm::clamp(std::abs(uv.y), 0.f, 0.5f);
+    // 背景色
+    glm::vec3 color = glm::vec3(163./255, 195./255, 247./255);
+//    glm::vec3 color = glm::vec3(0.3, 0.5, 0.85) - glm::vec3(0.2);
+    // 添加太阳(x, y)
+    glm::vec2 sun = glm::vec2(-1, -1);
+    // 到太阳的距离
+    float dist = glm::length(sun - uv);
+    // 距离越小, 越亮
+    // 通过pow函数, 让反比例函数迅速衰减, 大的值迅速膨胀, 小的值迅速衰减, 抑制太阳光晕
+    // alpha控制衰减速率. alpha越小, 越亮
+    float alpha = 1.1;
+    glm::vec3 sunLight = glm::vec3(glm::pow(1 / (dist + 1 * alpha), 2));
+    // 增加渐变(中间亮, 上下暗)
+    color = color + glm::vec3(sunLight);
+    // 增加环境光(整体调暗)
+    float k = 0.50; // k越大, 越暗
+    color = color - glm::vec3(k);
+    // 增加y轴渐变
+    auto c = smooth_func(y);
+    color = color - c;
+    color += water_ground(uv.y);
+//    color += glm::vec3(water_ground(uv.y), 0., -0.12);
+    return color;
+}
+
+// 把x从0-正无穷放缩到0-1, 且单调递增
+float sigmoid(float x)
+{
+//    return 1. - glm::exp(-pow(0.002 * x, 1.5));
+    float alpha = 0.01; // 控制与环境融合的程度, alpha越小, 整体融合程度越小
+    return 1 / (1 + glm::exp(-alpha * x));
+}
+
+glm::vec3 fog_draw(glm::vec3 color, float t)
+{
+    if (t <= (tMax / 5.0 * 2.5))
+    {
+        return color;
+    }
+    // 越远处, mix越大越接近灰色, 越近处, mix越小越接近本来的颜色
+    return glm::mix(color, glm::vec3(0.5) * glm::vec3(0.5, 0.75, 1.), sigmoid(t));
+}
+
+float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float w )
+{
+    float res = 1.0;
+    float ph = 1e20;
+    float t = mint;
+    for( int i=0; i<(256) && t<maxt; i++ )
+    {
+        auto k = ro + rd*t;
+        float h = map(k);
+        if( h<0.001 )
+            return 0.0;
+        float y = h*h/(2.0*ph);
+        float d = std::sqrt(h*h-y*y);
+        res = std::min( res, d/(w*std::max(0.0f,t-y)) );
+        ph = h;
+        t += h;
+    }
+    return res;
 }
 
 Color render(int x, int y)
@@ -251,14 +358,14 @@ Color render(int x, int y)
     glm::vec2 uv = fixUV(x, y);
 
     // set camera
-    auto target = glm::vec3(0, 0, 0);
+    auto target = glm::vec3(0, 0, 10);
     float camHight = -1.5;
     float camRad = 1.5;
     auto camLoc = glm::vec3 (camRad, camHight, camRad);
     auto camMat = camera(target, camLoc, 0.);
 
     glm::vec3 color(0);
-    glm::vec3 light = glm::vec3(10, -15, 7);
+    glm::vec3 light = glm::vec3(-10, -15, 20);
 
     auto ray = camMat.getRay(uv);
 
@@ -271,10 +378,26 @@ Color render(int x, int y)
     {
         glm::vec3 p = ro + rd * t;
         glm::vec3 n = calcNormalGround(p);
+        color = glm::vec3(0.67, 0.57, 0.44);
+
         float diff = glm::dot(
                 glm::normalize(light - p),
                 n);
-        color = glm::vec3(1) * diff;
+        diff = glm::clamp(diff, 0.f, 1.f);
+        auto lin = glm::vec3(0.);
+        // 软阴影
+        auto sh = softshadow(p, glm::normalize(light - p), 0.01, 100, 0.15); // Soft shadows
+
+        lin += glm::vec3(diff * 1.3) * glm::vec3(sh, sh * sh * 0.5 + 0.5 * sh, sh * sh * 0.8 + 0.2 * sh);
+
+        color *= lin;
+        // 绘制雾气
+        color = fog_draw(color, t);
+    }
+    else
+    {
+        // 绘制天空
+        color = sky_draw_my(uv);
     }
     return fromVec(color);
 }

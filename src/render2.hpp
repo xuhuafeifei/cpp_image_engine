@@ -204,7 +204,7 @@ float seg_water_ground_func(float y, float p)
     else
     {
         // exp用于控制海面颜色, exp越大, 海面越深
-        float exp = 0.95;
+        float exp = 10;
         res = glm::pow(y - p, exp) + c;
     }
     return res;
@@ -215,16 +215,16 @@ float seg_water_ground_func(float y, float p)
  */
 float water_ground(float y)
 {
-    return  - seg_water_ground_func(y, 0.25);
+    return  seg_water_ground_func(y, 0.25);
 }
 
 glm::vec3 sky_draw_my(glm::vec2 uv)
 {
     float y = glm::clamp(std::abs(uv.y), 0.f, 0.5f);
     // 背景色
-    glm::vec3 color = glm::vec3(0.3, 0.5, 0.85);
+    glm::vec3 color = glm::vec3(150./255, 195./255, 247./255);
     // 添加太阳(x, y)
-    glm::vec2 sun = glm::vec2(0., 0.);
+    glm::vec2 sun = glm::vec2(-1., -1);
     // 到太阳的距离
     float dist = glm::length(sun - uv);
     // 距离越小, 越亮
@@ -235,11 +235,13 @@ glm::vec3 sky_draw_my(glm::vec2 uv)
     // 增加渐变(中间亮, 上下暗)
     color = color + glm::vec3(sunLight);
     // 增加环境光(整体调暗)
-    color = color - glm::vec3(0.13);
+    float k = 0.50; // k越大, 越暗
+    color = color - glm::vec3(k);
     // 增加y轴渐变
     auto c = smooth_func(y);
     color = color - c;
     color += water_ground(uv.y);
+//    color += glm::vec3(water_ground(uv.y), 0., -0.12);
     return color;
 }
 
@@ -261,16 +263,33 @@ Color render(int x, int y)
 
     if (t < tMax) // If the ray hits an object
     {
-        glm::vec3 p = ro + rd * t; // Intersection point
-        glm::vec3 n = calcNormal(p); // Surface normal
-        float diff = glm::dot(glm::normalize(light - p), n); // Diffuse lighting
-        diff *= softshadow(p, glm::normalize(light - p), 0.01, 100, 0.15); // Soft shadows
-        color = glm::vec3(1) * diff; // Apply lighting to object
+//        glm::vec3 p = ro + rd * t; // Intersection point
+//        glm::vec3 n = calcNormal(p); // Surface normal
+//        float diff = glm::dot(glm::normalize(light - p), n); // Diffuse lighting
+//        diff *= softshadow(p, glm::normalize(light - p), 0.01, 100, 0.15); // Soft shadows
+//        color = glm::vec3(1) * diff; // Apply lighting to object
+//
+//        // Ambient occlusion (AO)
+//        float ao = calcAO(p, n); // Calculate AO
+//        ao = calcAO2(n); // Optional: Additional AO calculation
+//        color *= ao; // Apply AO to object color
+        glm::vec3 p = ro + rd * t;
+        glm::vec3 n = calcNormal(p);
+        color = glm::vec3(0.67, 0.57, 0.44);
 
-        // Ambient occlusion (AO)
-        float ao = calcAO(p, n); // Calculate AO
-        ao = calcAO2(n); // Optional: Additional AO calculation
-        color *= ao; // Apply AO to object color
+        float diff = glm::dot(
+                glm::normalize(light - p),
+                n);
+        diff = glm::clamp(diff, 0.f, 1.f);
+        auto lin = glm::vec3(0.);
+        // 软阴影
+        auto sh = softshadow(p, glm::normalize(light - p), 0.01, 100, 0.15); // Soft shadows
+
+        lin += glm::vec3(diff * 1.3) * glm::vec3(sh, sh * sh * 0.5 + 0.5 * sh, sh * sh * 0.8 + 0.2 * sh);
+
+        color *= lin;
+        // 绘制雾气
+//        color = fog_draw(color, t);
     }
 
     // Convert final color to output format
