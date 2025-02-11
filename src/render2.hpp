@@ -13,6 +13,7 @@
 //#include "raylib.h"
 //#include "glm/glm.hpp"
 #include "common.h"
+#include "camera2.h"
 
 const int width = 800;
 const int height = 600;
@@ -245,14 +246,129 @@ glm::vec3 sky_draw_my(glm::vec2 uv)
     return color;
 }
 
+glm::mat2 mat = glm::mat2(.6, -0.8, 0.8, 0.6);
+
+float random(float x)
+{
+    return glm::fract(23345.6754 * sin(x));
+}
+
+/**
+ * 原本的sin函数会生成无理数, 在某些情况下会不连续
+ */
+float hash12(glm::vec2 p)
+{
+    glm::vec3 p3 = glm::fract(glm::vec3(p.x, p.y, 0) * glm::vec3(.1031));
+    p3 += glm::dot(p3, glm::vec3(p3.y, p3.z, p3.x) + glm::vec3(33.33));
+    return glm::fract((p3.x + p3.y) * p3.z);
+}
+
+float random(glm::vec2 pos)
+{
+
+    /*
+    auto f = 5820.34280 * sin(glm::dot(pos, glm::vec2(24.432, 409.43)));
+    f = glm::fract(f);
+    return glm::abs(f);
+     */
+    return hash12(pos);
+}
+
+//glm::vec3 noise(glm::vec2 pos)
+//{
+//    auto i = glm::floor(pos);
+//    auto f = glm::fract(pos);
+//    auto u = glm::smoothstep(0.f, 1.f, f);
+//
+//    auto a = random(i);
+//    auto b = random(i + glm::vec2(1, 0));
+//    auto c = random(i + glm::vec2(0, 1));
+//    auto d = random(i + glm::vec2(1, 1));
+//
+//    auto u_x = u.x;
+//    auto u_y = u.y;
+//    auto u_x_inv = 1.0f - u_x;
+//    auto u_y_inv = 1.0f - u_y;
+//
+//    auto x1 = a * u_x_inv + b * u_x;
+//    auto x2 = c * u_x_inv + d * u_x;
+//    auto y1 = x1 * u_y_inv + x2 * u_y;
+//
+//    return glm::vec3(y1);
+//}
+//
+//float fbm(glm::vec2 p)
+//{
+////    auto a = 0.f;
+////    auto fac = 0.45f;
+////    for (int i = 0; i < 4; ++i)
+////    {
+////        a += fac * noise(p).x;
+////        p = glm::vec2(1.5) * mat * p;
+////        fac *= 0.12;
+////    }
+////    return a;
+//    return noise(p).x;
+//}
+
+glm::vec3 noise(glm::vec2 pos)
+{
+    auto i = glm::floor(pos);
+    auto f = glm::fract(pos);
+    auto u = glm::smoothstep(0.f, 1.f, f);
+
+    auto a = random(i);
+    auto b = random(i + glm::vec2(1, 0));
+    auto c = random(i + glm::vec2(0, 1));
+    auto d = random(i + glm::vec2(1, 1));
+
+    auto u_x = u.x;
+    auto u_y = u.y;
+    auto u_x_inv = 1.0f - u_x;
+    auto u_y_inv = 1.0f - u_y;
+
+    auto x1 = a * u_x_inv + b * u_x;
+    auto x2 = c * u_x_inv + d * u_x;
+    auto y1 = x1 * u_y_inv + x2 * u_y;
+
+    // 使用余弦插值来代替线性插值，获得更平滑的过渡
+    return glm::vec3(y1);
+}
+
+float fbm(glm::vec2 p)
+{
+    auto a = 0.f;
+    auto fac = 0.45f;
+    for (int i = 0; i < 4; ++i)
+    {
+        a += fac * noise(p).x;
+        p = glm::vec2(1.5) * mat * p;
+        fac *= 0.12f;  // 控制每一层噪声的衰减
+    }
+    return a;
+}
+
+
 Color render(int x, int y)
 {
-    // Convert pixel coordinates to UV coordinates
+//    // Convert pixel coordinates to UV coordinates
+//
+//    // Camera position and ray direction
+//    glm::vec3 ro = getCamera();
+//    glm::vec3 rd = glm::normalize(glm::vec3(uv, 0) - ro);
     glm::vec2 uv = fixUV(x, y);
+    // set camera
+    auto target = glm::vec3(0, 0, 20);
+    float camHight = -1.;
+    float camRad = 1.5;
+    auto camLoc = glm::vec3 (camRad, camHight, camRad);
+    auto camMat = camera(target, camLoc, 0.);
 
-    // Camera position and ray direction
-    glm::vec3 ro = getCamera();
-    glm::vec3 rd = glm::normalize(glm::vec3(uv, 0) - ro);
+    auto ray = camMat.getRay(uv);
+
+    auto ro = ray.ro;
+    auto rd = ray.rd;
+
 
     // auto color = sky_draw(rd);
     auto color = sky_draw_my(uv);
@@ -290,6 +406,17 @@ Color render(int x, int y)
         color *= lin;
         // 绘制雾气
 //        color = fog_draw(color, t);
+    }
+    else {
+        // clouds
+        float cloudH = 100.;
+//        auto step = glm::clamp(glm::vec3(std::abs((cloudH + ro.y) / rd.y)), 250.f, 450.f);
+        auto step = glm::vec3(std::abs((cloudH + ro.y) / rd.y));
+        glm::vec3 cloudUV = ro + step * rd;
+        auto fb = fbm(glm::vec2(cloudUV.x, cloudUV.z) * glm::vec2(0.01));
+//        std::cout << cloudUV.x << " " << cloudUV.y << " " << cloudUV.z << " " << fb << std::endl;
+//        color = glm::mix(color, glm::vec3(1., 0.95, 1.), glm::smoothstep(0.2f, 0.8f, fb));
+        color = glm::mix(color, glm::vec3(1., 0.95, 1.), fb);
     }
 
     // Convert final color to output format

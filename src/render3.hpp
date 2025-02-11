@@ -90,7 +90,6 @@ glm::vec3 noise(glm::vec2 pos)
 {
     auto i = glm::floor(pos);
     auto f = glm::fract(pos);
-    // auto u = f * f * (glm::vec2(3.0) - glm::vec2(2.0) * f);
     auto u = glm::smoothstep(0.f, 1.f, f);
     auto du = glm::vec2(6.) * u * (glm::vec2(1.) - u);
 
@@ -99,7 +98,6 @@ glm::vec3 noise(glm::vec2 pos)
     auto c = random(i + glm::vec2(0, 1));
     auto d = random(i + glm::vec2(1, 1));
 
-//    return glm::mix(a, b, u.x) + (c - a) * u.y * (1.f - u.x) + (d - b) * u.x * u.y;
     return glm::vec3(
             a + (b - a) * u.x * (1. - u.y) + (c - a) * (1. - u.x) * u.y + (d - a) * u.x * u.y,
             du * (glm::vec2(b - a, c - a) + (a - b - c + d) * glm::vec2(u.y, u.x))
@@ -111,7 +109,6 @@ glm::mat2 mat = glm::mat2(.6, -0.8, 0.8, 0.6);
 float ground(glm::vec3 x)
 {
     auto p = glm::vec3(0.005) * x;
-//    auto p = x;
     float a = 0.;
     float b = 1.;
     glm::vec2 d = glm::vec2(0);
@@ -126,16 +123,6 @@ float ground(glm::vec3 x)
         p.x = p2.x;
         p.y = p2.y;
         b *= 0.5;
-        /*
-        // a += noise(p).x;
-        // 将 glm::vec3 转换为 glm::vec2
-        glm::vec2 p2(p.x, p.y);
-        // 使用矩阵与向量的乘法
-        p2 = mat * p2;
-        // 将变换后的结果重新赋值给 p 的 x 和 y 分量
-        p.x = p2.x;
-        p.y = p2.y;
-         */
     }
 
     return 120 * a;
@@ -143,7 +130,8 @@ float ground(glm::vec3 x)
 
 float ground(glm::vec2 x)
 {
-    auto p = glm::vec2(0.008) * x;
+//    auto p = glm::vec2(0.008) * x;
+    auto p = x;
     float a = 0.;
     float b = 1.;
     glm::vec2 d = glm::vec2(0);
@@ -160,12 +148,14 @@ float ground(glm::vec2 x)
         b *= 0.5;
     }
 
-    return 120 * a;
+//    return 80 * a;
+    return a;
 }
 
 float groundH(glm::vec2 x)
 {
     glm::vec2 p = glm::vec2(0.005) * x;
+//    auto p = x;
     auto a = 0.;
     auto b = 1.;
     glm::vec2 d = glm::vec2(0);
@@ -180,6 +170,7 @@ float groundH(glm::vec2 x)
     }
 
     return 80 * a;
+//    return a;
 }
 
 float groundH(glm::vec3 x)
@@ -189,7 +180,7 @@ float groundH(glm::vec3 x)
 
 float map(glm::vec3 p)
 {
-    return groundH({p.x, p.z, 0}) - p.y;
+    return groundH({p.x, p.z, 0}) - 1 - p.y;
 }
 
 float mapGround(glm::vec2 p)
@@ -353,12 +344,25 @@ float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float w )
     return res;
 }
 
+float fbm(glm::vec2 p)
+{
+    auto a = 0.f;
+    auto fac = 0.45f;
+    for (int i = 0; i < 4; ++i)
+    {
+        a += fac * noise(p).x;
+        p = glm::vec2(1.5) * mat * p;
+        fac *= 0.15;
+    }
+    return a;
+}
+
 Color render(int x, int y)
 {
     glm::vec2 uv = fixUV(x, y);
 
     // set camera
-    auto target = glm::vec3(0, 0, 10);
+    auto target = glm::vec3(0, 0, 0);
     float camHight = -1.5;
     float camRad = 1.5;
     auto camLoc = glm::vec3 (camRad, camHight, camRad);
@@ -378,17 +382,19 @@ Color render(int x, int y)
     {
         glm::vec3 p = ro + rd * t;
         glm::vec3 n = calcNormalGround(p);
-        color = glm::vec3(0.67, 0.57, 0.44);
+        color = glm::vec3(0.57, 0.47, 0.34);
 
         float diff = glm::dot(
                 glm::normalize(light - p),
                 n);
         diff = glm::clamp(diff, 0.f, 1.f);
         auto lin = glm::vec3(0.);
+        lin += diff;
         // 软阴影
-        auto sh = softshadow(p, glm::normalize(light - p), 0.01, 100, 0.15); // Soft shadows
+        auto sh = softshadow(p, glm::normalize(light - p), 0.01, 100, 2.); // Soft shadows
 
-        lin += glm::vec3(diff * 1.3) * glm::vec3(sh, sh * sh * 0.5 + 0.5 * sh, sh * sh * 0.8 + 0.2 * sh);
+//        lin += glm::vec3(diff * 1.3) * glm::vec3(sh, sh * sh * 0.5 + 0.5 * sh, sh * sh * 0.8 + 0.2 * sh);
+        lin += glm::vec3(diff * 0.75) * glm::vec3(sh);
 
         color *= lin;
         // 绘制雾气
@@ -398,6 +404,13 @@ Color render(int x, int y)
     {
         // 绘制天空
         color = sky_draw_my(uv);
+        // clouds
+        float cloudH = 100.;
+        // y轴朝下为正
+        glm::vec3 cloudUV = ro + glm::vec3(std::abs((cloudH + ro.y) / rd.y)) * rd;
+//        std::cout << cloudUV.x << " " << cloudUV.y << " " << cloudUV.z << std::endl;
+//        color = glm::mix(color, glm::vec3(1., 0.95, 1.), glm::smoothstep(0.4f, 0.6f, fbm(glm::vec2(cloudUV.x, cloudUV.z) * glm::vec2(0.005))));
+        color = glm::mix(color, glm::vec3(1., 0.95, 1.), glm::smoothstep(0.2f, 0.8f, fbm(glm::vec2(cloudUV.x, cloudUV.z) * glm::vec2(0.01))));
     }
     return fromVec(color);
 }
