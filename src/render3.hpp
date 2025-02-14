@@ -455,10 +455,10 @@ Color render(int x, int y)
 
     glm::vec3 col = glm::vec3(0);
 
-    float an = iTime * 0.04f;
-    float r = 300.0f;
+    float an = iTime * 0.00f;
+    float r = 100.0f / 4;
     glm::vec2 pos2d = glm::vec2(r * glm::sin(an), r * glm::cos(an));
-    float h = groundL(pos2d) + 25.0f;
+    float h = groundL(pos2d) + 10.0f;
     glm::vec3 ro = glm::vec3(pos2d.x, h, pos2d.y);
     glm::vec3 target = glm::vec3(r * glm::sin(an + 0.01f), h, r * glm::cos(an + 0.01f));
     glm::mat3 cam = setCamera(ro, target, 0.0f);
@@ -479,7 +479,7 @@ Color render(int x, int y)
             tmin = glm::max(tmin, tp);
     }
     float t = rayMarch(ro, rd, tmin, tmax);
-    glm::vec3 sunlight = glm::normalize(glm::vec3(0.8f, 0.4f, -0.2f));
+    glm::vec3 sunlight = glm::normalize(glm::vec3(0.4f, 0.4f, -0.2f));
     float sundot = glm::clamp(glm::dot(rd, sunlight), 0.0f, 1.0f);
 
 
@@ -491,27 +491,30 @@ Color render(int x, int y)
         float r = noise(glm::vec2(p.x, p.z) * 0.1f).x;
 
         // rocks
-        col = (r * 0.25f + 0.75f) * 0.9f * difColor;
-        col = glm::mix(col, glm::vec3(0.09f, 0.06f, 0.03f) * (0.5f + 0.5f * r), glm::smoothstep(0.7f, 0.9f, n.y));
-        col = glm::mix(col, glm::vec3(0.045f, 0.045f, 0.015f) * (0.25f + 0.75f * r), glm::smoothstep(0.95f, 1.0f, n.y));
-        col *= 0.1f + 1.8f * glm::sqrt(fbm(glm::vec2(p.x, p.z) * 0.04f) * fbm(glm::vec2(p.x, p.z) * 0.005f));
+        col = (r * 0.55f + 0.75f) * 2.9f * difColor;
+        col = glm::mix(col, glm::vec3(0.09f, 0.06f, 0.03f) * (0.5f + 0.5f * r), n.y);
+        col = glm::mix(col, glm::vec3(0.085f, 0.045f, 0.015f) * (0.25f + 0.75f * r), glm::smoothstep(0.95f, 1.0f, n.y));
+        col *= 0.1f + 1.8f * glm::sqrt(fbm(glm::vec2(p.x, p.z) * 0.04f) * fbm(glm::vec2(p.x, p.z) * 0.01f));
 
         // Snow
-        float h = glm::smoothstep(35.0f, 80.0f, p.y + 35.0f * fbm(0.01f * glm::vec2(p.x, p.z)));
+        float h = glm::smoothstep(10.0f, 15.0f, p.y + 12.0f * fbm(0.01f * glm::vec2(p.x, p.z)));
+//        float e = glm::smoothstep(1.0f - 0.5f * h, 1.0f - 0.1f * h, n.y);
+//        float o = 0.15f + 0.3f * glm::smoothstep(0.0f, 0.02f, n.y + h * h);
         float e = glm::smoothstep(1.0f - 0.5f * h, 1.0f - 0.1f * h, n.y);
-        float o = 0.3f + 0.7f * glm::smoothstep(0.0f, 0.1f, n.y + h * h);
+        float o = 0.25f + 0.008f * glm::smoothstep(0.0f, 0.1f, n.y + h * h);
+
         float s = h * e * o;
-        col = glm::mix(col, 0.29f * glm::vec3(0.62f, 0.65f, 0.7f), glm::smoothstep(0.1f, 0.9f, s));
+        col = glm::mix(col, 0.89f * glm::vec3(0.62f, 0.65f, 0.7f), s);
 
         // Linear Lighting
         glm::vec3 lin = glm::vec3(0.0f);
 
         float dif = glm::clamp(glm::dot(sunlight, n), 0.0f, 1.0f);
         float sh = softShadow(p + 0.01f * sunlight, sunlight, t);
-        float amb = glm::clamp(0.5f + 0.5f * n.y, 0.0f, 1.0f);
+        float amb = glm::clamp(0.5f + 0.5f * n.y, 0.8f, 1.0f);
         float bac = glm::clamp(0.2f + 0.8f * glm::dot(glm::vec3(-sunlight.x, 0.0f, sunlight.z), n), 0.0f, 1.0f);
         lin += dif * glm::vec3(8.0f, 5.0f, 3.0f) * 1.8f * glm::vec3(sh, sh * sh * 0.5f + 0.5f * sh, sh * sh * 0.8f + 0.2f * sh);
-        lin += amb * glm::vec3(0.4f, 0.6f, 1.0f) * 1.2f;
+        lin += amb * glm::vec3(0.4f, 0.6f, 1.0f) * 2.f;
         lin += bac * glm::vec3(0.4f, 0.5f, 0.6f);
 
         col *= lin;
@@ -529,7 +532,7 @@ Color render(int x, int y)
     {
         // sky
         col = glm::vec3(0.3f, 0.5f, 0.85f) - (-rd.y) * (-rd.y) * 0.5f;
-        col = glm::mix(col, 0.85f * glm::vec3(0.7f, 0.75f, 0.85f), glm::pow(1.0f - glm::max(-rd.y, 0.0f), 4.0f));
+        col = glm::mix(col, 0.85f * glm::vec3(0.7f, 0.75f, 0.85f), glm::pow(1.0f - glm::max(rd.y, 0.0f), 4.0f));
 
         // sun
         col += 0.25f * glm::vec3(1.0f, 0.7f, 0.4f) * glm::pow(sundot, 5.0f);
@@ -543,7 +546,7 @@ Color render(int x, int y)
     }
 
     // sun scatter
-    col += 0.3f * glm::vec3(1.0f, 0.7f, 0.3f) * glm::pow(sundot, 8.0f);
+    col += 0.15f * glm::vec3(1.0f, 0.7f, 0.3f) * glm::pow(sundot, 8.0f);
 
     return fromVec(col);
 }

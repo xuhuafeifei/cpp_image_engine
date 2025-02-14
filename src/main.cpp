@@ -7,20 +7,6 @@
 #include "render3.hpp"
 #include <thread>
 
-void drawHalf(std::vector<Color> &pixels)
-{
-    for (int y = 0; y < height / 2; y++)
-        for (int x = 0; x < width; x++)
-            pixels[y * width + x] = render(x, y);
-}
-
-void drawHalf2(std::vector<Color> &pixels)
-{
-    for (int y = height / 2 + 1; y < height; y++)
-        for (int x = 0; x < width; x++)
-            pixels[y * width + x] = render(x, y);
-}
-
 void drawP(std::vector<Color> &pixels, int p, int tot)
 {
     int seg = height / tot;
@@ -40,6 +26,11 @@ int main(int argc, char **argv)
     a.join();
     b.join();
     c.join();
+
+    // 上下反转
+    for (int y = 0; y < height / 2; y++)
+        for (int x = 0; x < width; x++)
+            std::swap(pixels[y * width + x], pixels[(height - y - 1) * width + x]);
 
     InitWindow(width, height, "Render Result");
 
