@@ -392,70 +392,14 @@ float fbm(glm::vec2 p)
     return a;
 }
 
-Color render(int x, int y)
+Color render(int x, int y, float iTime)
 {
-//    glm::vec2 uv = fixUV(x, y);
-//
-//    // set camera
-//    auto target = glm::vec3(0, 0, 20);
-//    float camHight = -1.5;
-//    float camRad = 2.5;
-//    auto camLoc = glm::vec3 (camRad, camHight, camRad);
-//    auto camMat = camera(target, camLoc, 0.);
-//
-//    glm::vec3 col(0);
-//    glm::vec3 light = glm::vec3(-10, -15, 20);
-//
-//    auto ray = camMat.getRay(uv);
-//
-//    auto ro = ray.ro;
-//    auto rd = ray.rd;
-//
-//    float t = rayMarch(ro, rd);
-//    float iTime = 1.;
-//
-//    glm::vec3 sunlight = glm::normalize(glm::vec3(0.8f, -0.4f, -0.2f));
-//    float sundot = glm::clamp(glm::dot(rd, sunlight), 0.0f, 1.0f);
-
     auto uv = fixUV(x, y);
-    float iTime = 1.;
-
-//    glm::vec3 col = glm::vec3(0);
-//    float iTime = 1.;
-//
-//    float an = iTime * 0.04f;
-//    float r = 30.0f;
-//    glm::vec2 pos2d = glm::vec2(r * glm::sin(an), r * glm::cos(an));
-////     float h = - groundL(pos2d) + 25.0f;
-//    float h = - 5;
-//    glm::vec3 ro = glm::vec3(pos2d.x, h, pos2d.y);
-//    glm::vec3 target = glm::vec3(r * glm::sin(an + 0.01f), h, r * glm::cos(an + 0.01f));
-////    auto target = glm::vec3(0, -30, 0);
-//    glm::mat3 cam = setCamera(ro, target, 0.0f);
-//
-//    float fl = 1.0f;
-//    glm::vec3 rd = glm::normalize(cam * glm::vec3(uv, fl));
-//
-//    float tmin = 0.001f;
-//    float tmax = 1000.0f;
-//
-//    float maxh = 100.0f;
-//
-//    float tp = (ro.y - maxh) / (-rd.y);
-//    if(tp > 0.0f) {
-//        if(maxh > ro.y)
-//            tmax = glm::min(tmax, tp);
-//        else
-//            tmin = glm::max(tmin, tp);
-//    }
-//
-//    float t = rayMarch(ro, rd, tmin, tmax);
-//    glm::vec3 sunlight = glm::normalize(glm::vec3(0.8f, -0.4f, -0.2f));
-//    float sundot = glm::clamp(glm::dot(rd, sunlight), 0.0f, 1.0f);
+//    iTime = 1.5;
 
     glm::vec3 col = glm::vec3(0);
 
-    float an = iTime * 0.00f;
+    float an = iTime * 0.04f;
     float r = 100.0f / 4;
     glm::vec2 pos2d = glm::vec2(r * glm::sin(an), r * glm::cos(an));
     float h = groundL(pos2d) + 10.0f;
