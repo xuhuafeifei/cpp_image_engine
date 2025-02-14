@@ -14,7 +14,11 @@
 #include "common.h"
 #include "camera2.h"
 
-#define GROUND_TIME 14
+#define EPSILON 0.001f
+#define MAX_DIST 200.0f
+#define MAX_ITER 200
+
+#define GROUND_TIME 8
 
 const int width = 800;
 const int height = 600;
@@ -25,6 +29,8 @@ const float delta = 0.001;
 
 const glm::vec4 circle = glm::vec4({0, 0, 7, 2});
 const float y_offset = 0.2;
+
+//using namespace glm;
 
 glm::vec3 getCamera()
 {
@@ -86,25 +92,49 @@ float random(glm::vec2 pos)
     return hash12(pos);
 }
 
-glm::vec3 noise(glm::vec2 pos)
-{
-    auto i = glm::floor(pos);
-    auto f = glm::fract(pos);
-    auto u = glm::smoothstep(0.f, 1.f, f);
-    auto du = glm::vec2(6.) * u * (glm::vec2(1.) - u);
+//glm::vec3 noise(glm::vec2 pos)
+//{
+//    auto i = glm::floor(pos);
+//    auto f = glm::fract(pos);
+//    auto u = glm::smoothstep(0.f, 1.f, f);
+//    auto du = glm::vec2(6.) * u * (glm::vec2(1.) - u);
+//
+//    auto a = random(i);
+//    auto b = random(i + glm::vec2(1, 0));
+//    auto c = random(i + glm::vec2(0, 1));
+//    auto d = random(i + glm::vec2(1, 1));
+//
+//    return glm::vec3(
+//            a + (b - a) * u.x * (1. - u.y) + (c - a) * (1. - u.x) * u.y + (d - a) * u.x * u.y,
+//            du * (glm::vec2(b - a, c - a) + (a - b - c + d) * glm::vec2(u.y, u.x))
+//    );
+//}
+glm::vec3 noise(glm::vec2 pos) {
+    glm::vec2 i = glm::floor(pos);
+    glm::vec2 f = glm::fract(pos);
+    glm::vec2 u = f * f * (3.0f - 2.0f * f);
+    glm::vec2 du = 6.0f * u * (1.0f - u);
 
-    auto a = random(i);
-    auto b = random(i + glm::vec2(1, 0));
-    auto c = random(i + glm::vec2(0, 1));
-    auto d = random(i + glm::vec2(1, 1));
+    float a = random(i);
+    float b = random(i + glm::vec2(1.0f, 0.0f));
+    float c = random(i + glm::vec2(0.0f, 1.0f));
+    float d = random(i + glm::vec2(1.0f, 1.0f));
 
-    return glm::vec3(
-            a + (b - a) * u.x * (1. - u.y) + (c - a) * (1. - u.x) * u.y + (d - a) * u.x * u.y,
-            du * (glm::vec2(b - a, c - a) + (a - b - c + d) * glm::vec2(u.y, u.x))
-    );
+    return glm::vec3(a + (b - a) * u.x * (1.0f - u.y) +
+                     (c - a) * (1.0f - u.x) * u.y +
+                     (d - a) * u.x * u.y, du * (glm::vec2(b - a, c - a) +
+                                                (a - b - c + d) * glm::vec2(u.y, u.x)));
 }
 
 glm::mat2 mat = glm::mat2(.6, -0.8, 0.8, 0.6);
+
+glm::mat3 setCamera(glm::vec3 ro, glm::vec3 target, float cr) {
+    glm::vec3 z = glm::normalize(target - ro);
+    glm::vec3 up = glm::normalize(glm::vec3(glm::sin(cr), glm::cos(cr), 0.0f));
+    glm::vec3 x = glm::cross(z, up);
+    glm::vec3 y = glm::cross(x, z);
+    return glm::mat3(x, y, z);
+}
 
 float ground(glm::vec3 x)
 {
@@ -128,64 +158,127 @@ float ground(glm::vec3 x)
     return 120 * a;
 }
 
-float ground(glm::vec2 x)
-{
-//    auto p = glm::vec2(0.008) * x;
-    auto p = x;
-    float a = 0.;
-    float b = 1.;
-    glm::vec2 d = glm::vec2(0);
-
-    for (int i = 0; i < 8; ++i)
-    {
-        auto n = noise(x);
-        d += glm::vec2(n.y, n.z);
-        a += b * n.x / (1. + glm::dot(d, d));
-        glm::vec2 p2(p.x, p.y);
-        p2 = mat * p2 * glm::vec2(2.);
-        p.x = p2.x;
-        p.y = p2.y;
-        b *= 0.5;
-    }
-
-//    return 80 * a;
-    return a;
-}
-
-float groundH(glm::vec2 x)
-{
-    glm::vec2 p = glm::vec2(0.005) * x;
+//float ground(glm::vec2 x)
+//{
+////    auto p = glm::vec2(0.008) * x;
 //    auto p = x;
-    auto a = 0.;
-    auto b = 1.;
+//    float a = 0.;
+//    float b = 1.;
+//    glm::vec2 d = glm::vec2(0);
+//
+//    for (int i = 0; i < 8; ++i)
+//    {
+//        auto n = noise(x);
+//        d += glm::vec2(n.y, n.z);
+//        a += b * n.x / (1. + glm::dot(d, d));
+//        glm::vec2 p2(p.x, p.y);
+//        p2 = mat * p2 * glm::vec2(2.);
+//        p.x = p2.x;
+//        p.y = p2.y;
+//        b *= 0.5;
+//    }
+//
+////    return 80 * a;
+//    return a;
+//}
+
+float ground(glm::vec2 x) {
+    glm::vec2 p = 0.003f * x;
+//    auto p = x;
+    float a = 0.0f;
+    float b = 1.0f;
     glm::vec2 d = glm::vec2(0);
 
-    for (int i = 0; i < GROUND_TIME; ++i)
-    {
+    for(int i = 0; i < 8; i++) {
         glm::vec3 n = noise(p);
         d += glm::vec2(n.y, n.z);
-        a += b * n.x / (1. + glm::dot(d, d));
-        p = mat * p * glm::vec2(2.);
-        b *= 0.5;
+        a += b * n.x / (1.0f + glm::dot(d, d));
+        p = mat * p * 2.0f;
+        b *= 0.5f;
     }
 
-    return 80 * a;
+    return 120.0f * a;
 //    return a;
+//    return noise(x).x;
 }
 
-float groundH(glm::vec3 x)
-{
-    return groundH({x.x, x.y});
+//float ground(glm::vec2 x)
+//{
+////    glm::vec2 p = glm::vec2(0.005) * x;
+//    auto p = x;
+//    auto a = 0.;
+//    auto b = 1.;
+//    glm::vec2 d = glm::vec2(0);
+//
+//    for (int i = 0; i < GROUND_TIME; ++i)
+//    {
+//        glm::vec3 n = noise(p);
+//        d += glm::vec2(n.y, n.z);
+//        a += b * n.x / (1. + glm::dot(d, d));
+//        p = mat * p * glm::vec2(2.);
+//        b *= 0.5;
+//    }
+//
+//    return a;
+////    return 80 * a;
+//}
+
+//float groundH(glm::vec2 x)
+//{
+//    glm::vec2 p = glm::vec2(0.005) * x;
+////    auto p = x;
+//    auto a = 0.;
+//    auto b = 1.;
+//    glm::vec2 d = glm::vec2(0);
+//
+//    for (int i = 0; i < GROUND_TIME; ++i)
+//    {
+//        glm::vec3 n = noise(p);
+//        d += glm::vec2(n.y, n.z);
+//        a += b * n.x / (1. + glm::dot(d, d));
+//        p = mat * p * glm::vec2(2.);
+//        b *= 0.5;
+//    }
+//
+//    return 80 * a;
+////    return a;
+//}
+
+float groundH(glm::vec2 x) {
+    glm::vec2 p = 0.003f * x;
+    float a = 0.0f;
+    float b = 1.0f;
+    glm::vec2 d = glm::vec2(0);
+
+    for(int i = 0; i < 12; i++) {
+        glm::vec3 n = noise(p);
+        d += glm::vec2(n.y, n.z);
+        a += b * n.x / (1.0f + glm::dot(d, d));
+        p = mat * p * 2.0f;
+        b *= 0.5f;
+    }
+
+    return 120.0f * a;
 }
 
-float map(glm::vec3 p)
-{
-    return groundH({p.x, p.z, 0}) - 1 - p.y;
-}
+float groundL(const glm::vec2& x) {
+    glm::vec2 p = 0.003f * x;
+    float a = 0.0f;
+    float b = 1.0f;
+    glm::vec2 d(0.0f, 0.0f);  // 代替 glm::vec2(0)
 
-float mapGround(glm::vec2 p)
-{
-    return groundH({p.x, p.y}) - p.y;
+    for (int i = 0; i < 3; i++) {
+        glm::vec3 n = noise(p);  // 获取噪声值
+        d += glm::vec2(n.y, n.z);  // 将噪声的 y 和 z 分量作为二维向量
+        a += b * n.x / (1.0f + glm::dot(d, d));  // 计算 a
+
+        // 使用 glm::mat2 对 p 进行变换
+        p = mat * p * 2.0f;  // 对 p 进行二维矩阵变换
+
+        b *= 0.5f;  // 更新 b
+    }
+
+    return 120.0f * a;  // 返回计算结果
 }
 
 Color fromVec(glm::vec3 v)
@@ -199,149 +292,91 @@ Color fromVec(glm::vec3 v)
 
 float rayMarch(glm::vec3 ro, glm::vec3 rd)
 {
-    float t = tMin;
+//    float t = tMin;
+//
+//    for (int i = 0; i < maxMarchTime && t < tMax; i++)
+//    {
+//        glm::vec3 p = ro + rd * t;
+//        float d = map(p);
+//        if (d < delta * t)
+//            break;
+//        t += .4f * d;
+//    }
+//
+//    return t;
+    return 11111.;
+}
 
-    for (int i = 0; i < maxMarchTime && t < tMax; i++)
-    {
-        glm::vec3 p = ro + rd * t;
-        float d = map(p);
-        if (d < delta * t)
+float rayMarch(glm::vec3 ro, glm::vec3 rd, float tmin, float tmax) {
+    float t = tmin;
+    for(int i = 0; i < MAX_ITER && t < tmax; i++) {
+        glm::vec3 p = ro + t * rd;
+        float h = p.y - ground(glm::vec2(p.x, p.z));
+        if(abs(h) < EPSILON * t)
             break;
-        t += .4f * d;
+        t += 0.3f * h;
     }
-
     return t;
 }
 
-glm::vec3 calcNormal(glm::vec3 p)
-{
-    const glm::vec3 v1(1, -1, -1);
-    const glm::vec3 v2(-1, -1, 1);
-    const glm::vec3 v3(-1, 1, -1);
-    const glm::vec3 v4(1);
-    return glm::normalize(
-            glm::vec3(
-                    map(p + v1 * delta) * v1 +
-                    map(p + v2 * delta) * v2 +
-                    map(p + v3 * delta) * v3 +
-                    map(p + v4 * delta) * v4));
-}
+//glm::vec3 calcNormal(glm::vec3 p)
+//{
+//    const glm::vec3 v1(1, -1, -1);
+//    const glm::vec3 v2(-1, -1, 1);
+//    const glm::vec3 v3(-1, 1, -1);
+//    const glm::vec3 v4(1);
+//    return glm::normalize(
+//            glm::vec3(
+//                    map(p + v1 * delta) * v1 +
+//                    map(p + v2 * delta) * v2 +
+//                    map(p + v3 * delta) * v3 +
+//                    map(p + v4 * delta) * v4));
+//}
 
-glm::vec3 calcNormalGround(glm::vec3 p)
-{
-    glm::vec2 e = glm::vec2(1e-5, 0);
+glm::vec3 calcNorm(glm::vec3 p, float t) {
+    glm::vec2 epsilon = glm::vec2(0.0027f * t, 0.0f);
     return glm::normalize(
             glm::vec3(
-                    mapGround({p.x - e.x, p.z - e.y}) - mapGround({p.x + e.x, p.z + e.y}),
-                    -2.0 * e.x,
-                    mapGround({p.x - e.y, p.z - e.x}) - mapGround({p.x + e.y, p.z + e.x})
+                        groundH(glm::vec2(p.x, p.z) - glm::vec2(epsilon.x, epsilon.y)) - groundH(glm::vec2(p.x, p.z) + glm::vec2(epsilon.x, epsilon.y)),
+                        2.0f * epsilon.x,
+                        groundH(glm::vec2(p.x, p.z) - glm::vec2(epsilon.y, epsilon.x)) - groundH(glm::vec2(p.x, p.z) + glm::vec2(epsilon.y, epsilon.x))
                     )
             );
 }
 
-/**
- * 二次函数
- */
-float smooth_func(float f)
-{
-    // a控制锐边程度, a越大, 锐边越明显
-    const float a = 0.42f;
-    const float c = 0.f;
-    return  a * a * f + c;
-}
+//float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float w )
+//{
+//    float res = 1.0;
+//    float ph = 1e20;
+//    float t = mint;
+//    for( int i=0; i<(256) && t<maxt; i++ )
+//    {
+//        auto k = ro + rd*t;
+//        float h = map(k);
+//        if( h<0.001 )
+//            return 0.0;
+//        float y = h*h/(2.0*ph);
+//        float d = std::sqrt(h*h-y*y);
+//        res = std::min( res, d/(w*std::max(0.0f,t-y)) );
+//        ph = h;
+//        t += h;
+//    }
+//    return res;
+//}
 
-/**
- * 分段函数
- */
-float seg_water_ground_func(float y, float p)
-{
-    float res;
-    float c = 0.2;
-    if (y < p)
-    {
-        res = c / (1 + p - y);
+float softShadow(glm::vec3 ro, glm::vec3 rd, float dis) {
+    float minStep = glm::clamp(0.01f * dis, 0.5f, 50.0f);
+    float res = 1.0f;
+    float t = 0.001f;
+    for(int i = 0; i < 80; i++) {
+        glm::vec3 p = ro + t * rd;
+        float h = p.y - ground(glm::vec2(p.x, p.z));
+        res = glm::min(res, 8.0f * h / t);
+        t += glm::max(minStep, h);
+        if(res < 0.001f || p.y > 200.0f)
+            break;
     }
-    else
-    {
-        // exp用于控制海面颜色, exp越大, 海面越深
-        float exp = 10;
-        res = glm::pow(y - p, exp) + c;
-    }
-    return res;
-}
-
-/**
- * 增加海平面
- */
-float water_ground(float y)
-{
-    return  seg_water_ground_func(y, 0.25);
-}
-
-glm::vec3 sky_draw_my(glm::vec2 uv)
-{
-    float y = glm::clamp(std::abs(uv.y), 0.f, 0.5f);
-    // 背景色
-    glm::vec3 color = glm::vec3(163./255, 195./255, 247./255);
-//    glm::vec3 color = glm::vec3(0.3, 0.5, 0.85) - glm::vec3(0.2);
-    // 添加太阳(x, y)
-    glm::vec2 sun = glm::vec2(-1, -1);
-    // 到太阳的距离
-    float dist = glm::length(sun - uv);
-    // 距离越小, 越亮
-    // 通过pow函数, 让反比例函数迅速衰减, 大的值迅速膨胀, 小的值迅速衰减, 抑制太阳光晕
-    // alpha控制衰减速率. alpha越小, 越亮
-    float alpha = 1.1;
-    glm::vec3 sunLight = glm::vec3(glm::pow(1 / (dist + 1 * alpha), 2));
-    // 增加渐变(中间亮, 上下暗)
-    color = color + glm::vec3(sunLight);
-    // 增加环境光(整体调暗)
-    float k = 0.50; // k越大, 越暗
-    color = color - glm::vec3(k);
-    // 增加y轴渐变
-    auto c = smooth_func(y);
-    color = color - c;
-    color += water_ground(uv.y);
-//    color += glm::vec3(water_ground(uv.y), 0., -0.12);
-    return color;
-}
-
-// 把x从0-正无穷放缩到0-1, 且单调递增
-float sigmoid(float x)
-{
-//    return 1. - glm::exp(-pow(0.002 * x, 1.5));
-    float alpha = 0.01; // 控制与环境融合的程度, alpha越小, 整体融合程度越小
-    return 1 / (1 + glm::exp(-alpha * x));
-}
-
-glm::vec3 fog_draw(glm::vec3 color, float t)
-{
-    if (t <= (tMax / 5.0 * 2.5))
-    {
-        return color;
-    }
-    // 越远处, mix越大越接近灰色, 越近处, mix越小越接近本来的颜色
-    return glm::mix(color, glm::vec3(0.5) * glm::vec3(0.5, 0.75, 1.), sigmoid(t));
-}
-
-float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float w )
-{
-    float res = 1.0;
-    float ph = 1e20;
-    float t = mint;
-    for( int i=0; i<(256) && t<maxt; i++ )
-    {
-        auto k = ro + rd*t;
-        float h = map(k);
-        if( h<0.001 )
-            return 0.0;
-        float y = h*h/(2.0*ph);
-        float d = std::sqrt(h*h-y*y);
-        res = std::min( res, d/(w*std::max(0.0f,t-y)) );
-        ph = h;
-        t += h;
-    }
-    return res;
+    return glm::clamp(res, 0.0f, 1.0f);
 }
 
 float fbm(glm::vec2 p)
@@ -359,60 +394,158 @@ float fbm(glm::vec2 p)
 
 Color render(int x, int y)
 {
-    glm::vec2 uv = fixUV(x, y);
+//    glm::vec2 uv = fixUV(x, y);
+//
+//    // set camera
+//    auto target = glm::vec3(0, 0, 20);
+//    float camHight = -1.5;
+//    float camRad = 2.5;
+//    auto camLoc = glm::vec3 (camRad, camHight, camRad);
+//    auto camMat = camera(target, camLoc, 0.);
+//
+//    glm::vec3 col(0);
+//    glm::vec3 light = glm::vec3(-10, -15, 20);
+//
+//    auto ray = camMat.getRay(uv);
+//
+//    auto ro = ray.ro;
+//    auto rd = ray.rd;
+//
+//    float t = rayMarch(ro, rd);
+//    float iTime = 1.;
+//
+//    glm::vec3 sunlight = glm::normalize(glm::vec3(0.8f, -0.4f, -0.2f));
+//    float sundot = glm::clamp(glm::dot(rd, sunlight), 0.0f, 1.0f);
 
-    // set camera
-    auto target = glm::vec3(0, 0, 0);
-    float camHight = -1.5;
-    float camRad = 1.5;
-    auto camLoc = glm::vec3 (camRad, camHight, camRad);
-    auto camMat = camera(target, camLoc, 0.);
+    auto uv = fixUV(x, y);
+    float iTime = 1.;
 
-    glm::vec3 color(0);
-    glm::vec3 light = glm::vec3(-10, -15, 20);
+//    glm::vec3 col = glm::vec3(0);
+//    float iTime = 1.;
+//
+//    float an = iTime * 0.04f;
+//    float r = 30.0f;
+//    glm::vec2 pos2d = glm::vec2(r * glm::sin(an), r * glm::cos(an));
+////     float h = - groundL(pos2d) + 25.0f;
+//    float h = - 5;
+//    glm::vec3 ro = glm::vec3(pos2d.x, h, pos2d.y);
+//    glm::vec3 target = glm::vec3(r * glm::sin(an + 0.01f), h, r * glm::cos(an + 0.01f));
+////    auto target = glm::vec3(0, -30, 0);
+//    glm::mat3 cam = setCamera(ro, target, 0.0f);
+//
+//    float fl = 1.0f;
+//    glm::vec3 rd = glm::normalize(cam * glm::vec3(uv, fl));
+//
+//    float tmin = 0.001f;
+//    float tmax = 1000.0f;
+//
+//    float maxh = 100.0f;
+//
+//    float tp = (ro.y - maxh) / (-rd.y);
+//    if(tp > 0.0f) {
+//        if(maxh > ro.y)
+//            tmax = glm::min(tmax, tp);
+//        else
+//            tmin = glm::max(tmin, tp);
+//    }
+//
+//    float t = rayMarch(ro, rd, tmin, tmax);
+//    glm::vec3 sunlight = glm::normalize(glm::vec3(0.8f, -0.4f, -0.2f));
+//    float sundot = glm::clamp(glm::dot(rd, sunlight), 0.0f, 1.0f);
 
-    auto ray = camMat.getRay(uv);
+    glm::vec3 col = glm::vec3(0);
 
-    auto ro = ray.ro;
-    auto rd = ray.rd;
+    float an = iTime * 0.04f;
+    float r = 300.0f;
+    glm::vec2 pos2d = glm::vec2(r * glm::sin(an), r * glm::cos(an));
+    float h = groundL(pos2d) + 25.0f;
+    glm::vec3 ro = glm::vec3(pos2d.x, h, pos2d.y);
+    glm::vec3 target = glm::vec3(r * glm::sin(an + 0.01f), h, r * glm::cos(an + 0.01f));
+    glm::mat3 cam = setCamera(ro, target, 0.0f);
 
-    float t = rayMarch(ro, rd);
+    float fl = 1.0f;
+    glm::vec3 rd = glm::normalize(cam * glm::vec3(uv, fl));
+
+    float tmin = 0.001f;
+    float tmax = 1000.0f;
+
+    float maxh = 300.0f;
+
+    float tp = (maxh - ro.y) / rd.y;
+    if(tp > 0.0f) {
+        if(maxh > ro.y)
+            tmax = glm::min(tmax, tp);
+        else
+            tmin = glm::max(tmin, tp);
+    }
+    float t = rayMarch(ro, rd, tmin, tmax);
+    glm::vec3 sunlight = glm::normalize(glm::vec3(0.8f, 0.4f, -0.2f));
+    float sundot = glm::clamp(glm::dot(rd, sunlight), 0.0f, 1.0f);
+
 
     if (t < tMax)
     {
-        glm::vec3 p = ro + rd * t;
-        glm::vec3 n = calcNormalGround(p);
-        color = glm::vec3(0.57, 0.47, 0.34);
+        glm::vec3 p = ro + t * rd;
+        glm::vec3 n = calcNorm(p, t);
+        glm::vec3 difColor = glm::mix(glm::vec3(0.08f, 0.05f, 0.03f), glm::vec3(0.10f, 0.09f, 0.08f), noise(glm::vec2(p.x, p.z) * 0.02f).x);
+        float r = noise(glm::vec2(p.x, p.z) * 0.1f).x;
 
-        float diff = glm::dot(
-                glm::normalize(light - p),
-                n);
-        diff = glm::clamp(diff, 0.f, 1.f);
-        auto lin = glm::vec3(0.);
-        lin += diff;
-        // 软阴影
-        auto sh = softshadow(p, glm::normalize(light - p), 0.01, 100, 2.); // Soft shadows
+        // rocks
+        col = (r * 0.25f + 0.75f) * 0.9f * difColor;
+        col = glm::mix(col, glm::vec3(0.09f, 0.06f, 0.03f) * (0.5f + 0.5f * r), glm::smoothstep(0.7f, 0.9f, n.y));
+        col = glm::mix(col, glm::vec3(0.045f, 0.045f, 0.015f) * (0.25f + 0.75f * r), glm::smoothstep(0.95f, 1.0f, n.y));
+        col *= 0.1f + 1.8f * glm::sqrt(fbm(glm::vec2(p.x, p.z) * 0.04f) * fbm(glm::vec2(p.x, p.z) * 0.005f));
 
-//        lin += glm::vec3(diff * 1.3) * glm::vec3(sh, sh * sh * 0.5 + 0.5 * sh, sh * sh * 0.8 + 0.2 * sh);
-        lin += glm::vec3(diff * 0.75) * glm::vec3(sh);
+        // Snow
+        float h = glm::smoothstep(35.0f, 80.0f, p.y + 35.0f * fbm(0.01f * glm::vec2(p.x, p.z)));
+        float e = glm::smoothstep(1.0f - 0.5f * h, 1.0f - 0.1f * h, n.y);
+        float o = 0.3f + 0.7f * glm::smoothstep(0.0f, 0.1f, n.y + h * h);
+        float s = h * e * o;
+        col = glm::mix(col, 0.29f * glm::vec3(0.62f, 0.65f, 0.7f), glm::smoothstep(0.1f, 0.9f, s));
 
-        color *= lin;
-        // 绘制雾气
-        color = fog_draw(color, t);
+        // Linear Lighting
+        glm::vec3 lin = glm::vec3(0.0f);
+
+        float dif = glm::clamp(glm::dot(sunlight, n), 0.0f, 1.0f);
+        float sh = softShadow(p + 0.01f * sunlight, sunlight, t);
+        float amb = glm::clamp(0.5f + 0.5f * n.y, 0.0f, 1.0f);
+        float bac = glm::clamp(0.2f + 0.8f * glm::dot(glm::vec3(-sunlight.x, 0.0f, sunlight.z), n), 0.0f, 1.0f);
+        lin += dif * glm::vec3(8.0f, 5.0f, 3.0f) * 1.8f * glm::vec3(sh, sh * sh * 0.5f + 0.5f * sh, sh * sh * 0.8f + 0.2f * sh);
+        lin += amb * glm::vec3(0.4f, 0.6f, 1.0f) * 1.2f;
+        lin += bac * glm::vec3(0.4f, 0.5f, 0.6f);
+
+        col *= lin;
+
+        // half-angle
+        glm::vec3 hal = glm::normalize(sunlight - rd);
+
+        col += (0.7f + 0.3f * s) * (0.04f + 0.96f * glm::pow(glm::clamp(1.0f + glm::dot(hal, rd), 0.0f, 1.0f), 5.0f)) *
+               glm::vec3(7.0f, 5.0f, 3.0f) * sh * dif *
+               glm::pow(glm::clamp(glm::dot(n, hal), 0.0f, 1.0f), 16.0f);
+
+        col = glm::mix(col, 0.65f * glm::vec3(0.5f, 0.75f, 1.0f), 1.0f - glm::exp(-glm::pow(0.002f * t, 1.5f)));
     }
     else
     {
-        // 绘制天空
-        color = sky_draw_my(uv);
+        // sky
+        col = glm::vec3(0.3f, 0.5f, 0.85f) - (-rd.y) * (-rd.y) * 0.5f;
+        col = glm::mix(col, 0.85f * glm::vec3(0.7f, 0.75f, 0.85f), glm::pow(1.0f - glm::max(-rd.y, 0.0f), 4.0f));
+
+        // sun
+        col += 0.25f * glm::vec3(1.0f, 0.7f, 0.4f) * glm::pow(sundot, 5.0f);
+        col += 0.25f * glm::vec3(1.0f, 0.8f, 0.6f) * glm::pow(sundot, 64.0f);
+        col += 0.2f * glm::vec3(1.0f, 0.8f, 0.6f) * glm::pow(sundot, 512.0f);
+
         // clouds
-        float cloudH = 100.;
-        // y轴朝下为正
-        glm::vec3 cloudUV = ro + glm::vec3(std::abs((cloudH + ro.y) / rd.y)) * rd;
-//        std::cout << cloudUV.x << " " << cloudUV.y << " " << cloudUV.z << std::endl;
-//        color = glm::mix(color, glm::vec3(1., 0.95, 1.), glm::smoothstep(0.4f, 0.6f, fbm(glm::vec2(cloudUV.x, cloudUV.z) * glm::vec2(0.005))));
-        color = glm::mix(color, glm::vec3(1., 0.95, 1.), glm::smoothstep(0.2f, 0.8f, fbm(glm::vec2(cloudUV.x, cloudUV.z) * glm::vec2(0.01))));
+        glm::vec2 skyPos = glm::vec2(ro.x, ro.z) + glm::vec2(rd.x, rd.z) * (200.0f - (-ro.y)) / (-rd.y) + iTime * 5.0f;
+        col = glm::mix(col, glm::vec3(1.0f, 0.95f, 1.0f), 0.5 * glm::smoothstep(0.1f, 0.5f, fbm(.005f * skyPos)));
+
     }
-    return fromVec(color);
+
+    // sun scatter
+    col += 0.3f * glm::vec3(1.0f, 0.7f, 0.3f) * glm::pow(sundot, 8.0f);
+
+    return fromVec(col);
 }
 
 #endif //RMRENDERER_RENDER3_H
