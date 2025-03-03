@@ -3,7 +3,7 @@
 #include <string>
 #include <thread>
 
-#define MOUNTAIN_DRAW
+//#define MOUNTAIN_DRAW
 
 # ifdef MOUNTAIN_DRAW
 //    # define USE_IMAGE_EXPORT

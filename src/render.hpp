@@ -6,6 +6,8 @@
 #include "common.h"
 #include "camera.h"
 
+using namespace std;
+
 const int width = 800;
 const int height = 600;
 const float tMax = 200.0;
@@ -33,6 +35,16 @@ unsigned char convert(float v)
     return (unsigned char)v;
 }
 
+glm::mat2 mat = glm::mat2(.6, -0.8, 0.8, 0.6);
+
+glm::mat3 setCamera(glm::vec3 ro, glm::vec3 target, float cr) {
+    glm::vec3 z = glm::normalize(target - ro);
+    glm::vec3 up = glm::normalize(glm::vec3(glm::sin(cr), glm::cos(cr), 0.0f));
+    glm::vec3 x = glm::cross(z, up);
+    glm::vec3 y = glm::cross(x, z);
+    return glm::mat3(x, y, z);
+}
+
 float sdfSphere(glm::vec3 p, glm::vec3 o, float r)
 {
     // {距离, tag}
@@ -44,6 +56,10 @@ float sdfGround(glm::vec3 p)
     // 很操蛋, 我的这个y轴是向下为正
     // 所以这里应该是地面坐标 - p.y
     return - p.y;
+}
+
+float groundL(const glm::vec2& x) {
+    return sdfGround(glm::vec3 (x.x, x.y, 0));
 }
 
 /**
@@ -222,24 +238,49 @@ float normalShadow(glm::vec3 p, glm::vec3 light)
     return 1;
 }
 
-Color render(int x, int y, float t)
+Color render(int x, int y, float iTime)
 {
-    glm::vec2 uv = fixUV(x, y);
+
+    auto uv = fixUV(x, y);
+//    iTime = 1.5;
+
+    glm::vec3 col = glm::vec3(0);
+
+    float an = iTime * 0.04f;
+    float r = 10.0f / 4;
+    float base_offset = 5.5f + 5.f + 3.f;
+    glm::vec2 pos2d = glm::vec2(r * glm::sin(an), r * glm::cos(an));
+//    float h = groundL(pos2d);
+    float h = 1;
+    glm::vec3 ro = glm::vec3(pos2d.x, h - 4, pos2d.y + base_offset);
+    glm::vec3 target = glm::vec3(r * glm::sin(an + 0.01f), h, r * glm::cos(an + 0.01f));
+//    cout << ro.x << " " << ro.y << " " << ro.z << endl;
+//    cout << target.x << " " << target.y << " " << target.z << endl;
+//    cout << " ---- " << endl;
+    glm::mat3 cam = setCamera(ro, target, 0.0f);
+
+    float fl = 1.0f;
+    glm::vec3 rd = glm::normalize(cam * glm::vec3(uv, fl));
+
+
+//    glm::vec2 uv = fixUV(x, y);
 
     glm::vec3 bg = glm::vec3(0.7, 0.7, 0.9);
     // 增加y轴上的渐变
     glm::vec3 color = bg - glm::normalize(uv).y * glm::vec3(0.13);
-    camera cam;
-    auto ray = cam.ray(uv);
+//    camera cam;
+//    auto ray = cam.ray(uv);
+
     glm::vec3 light = glm::vec3(10, -15, -5);
 
-    auto rm = rayMarch(ray.ro, glm::normalize(ray.rd));
+//    auto rm = rayMarch(ray.ro, glm::normalize(ray.rd));
+    auto rm = rayMarch(ro, rd);
 
     // rm.y = -1时, 表示没有hit object
     if (rm.y > 0)
     {
         auto t = rm.x;
-        glm::vec3 p = ray.at(t);
+        glm::vec3 p = ro + t * rd;
         glm::vec3 n = (rm.y < 1.1) ? glm::vec3(0, -1, 0) : calcNormal(p);
         float diff = glm::dot(
             glm::normalize(light - p),
