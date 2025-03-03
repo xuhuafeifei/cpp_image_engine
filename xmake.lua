@@ -8,6 +8,11 @@ target("rmRenderer")
     add_files("src/*.cpp")
     add_packages("raylib")
     add_packages("glm")
+--     add_packages("stb_image")
+--     add_packages("thirdparty")
+--
+--     -- 添加 stb_image 头文件路径
+--     add_includedirs("thirdparty/stb")
 
 -- add_rules("mode.debug", "mode.release")
 --

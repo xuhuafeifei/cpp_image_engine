@@ -10,6 +10,7 @@
     # define REVERSE_Y
     # include "render3.hpp"
 # else
+# define REVERSE_Y
     # include "render.hpp"
 # endif
 
