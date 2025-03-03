@@ -17,7 +17,7 @@ const int maxMarchTime = 128;
 const float delta = 0.001;
 float myTime = 0.0f;
 
-const glm::vec4 circle = glm::vec4({0, -2, 7, 2});
+const glm::vec4 circle = glm::vec4({-0.10, 0.2, -0.3, 0.1});
 const glm::vec3 cir = {circle.x, circle.y, circle.z};
 
 glm::vec2 map(glm::vec3 p);
@@ -44,13 +44,10 @@ glm::vec3 forwardSF(float i, float n) {
 }
 
 glm::vec2 mapSpecial(const glm::vec3& q) {
-    // Plane
     glm::vec2 res = glm::vec2(q.y, 2.0f);
 
-    // Sphere
     float d = glm::length(q - glm::vec3(0.0f, 0.1f + 0.05f * std::sin(myTime), 0.0f)) - 0.1f;
 
-    // Smooth union
     return smin(res.x, d, 0.05f);
 }
 
@@ -80,6 +77,22 @@ float calcAO(const glm::vec3& pos, const glm::vec3& nor, float ran) {
     }
     ao /= static_cast<float>(num);
     return glm::clamp(ao, 0.0f, 1.0f);
+}
+
+float calcAO(const glm::vec3& pos, const glm::vec3& nor) {
+    float occ = 0.0f;
+    float sca = 1.0f;
+
+    for (int i = 0; i < 5; ++i) {
+        float h = 0.01f + 0.12f * static_cast<float>(i) / 4.0f; // 计算采样距离
+        float d = map(pos + h * nor).x;                        // 距离场值
+        occ += (h - d) * sca;                                 // 累积遮挡值
+        sca *= 0.95f;                                         // 缩减权重
+        if (occ > 0.35f) break;                               // 提前退出
+    }
+
+    // 返回环境光遮蔽值
+    return glm::clamp(1.0f - 3.0f * occ, 0.0f, 1.0f) * (0.5f + 0.5f * nor.y);
 }
 
 glm::vec4 generateRandom(float seed) {
@@ -113,6 +126,29 @@ glm::vec4 texelFetch(unsigned char* imageData, int width, int height, const glm:
     );
 
     return texel;
+}
+
+float calcSoftshadow(const glm::vec3& ro, const glm::vec3& rd, float mint, float tmax) {
+    // 边界体积检查
+    float tp = (0.8f - ro.y) / rd.y;
+    if (tp > 0.0f) {
+        tmax = std::min(tmax, tp); // 更新最大距离
+    }
+
+    float res = 1.0f; // 初始遮挡值
+    float t = mint;   // 当前光线步进距离
+
+    for (int i = 0; i < 24; ++i) {
+        float h = map(ro + rd * t).x; // 距离场值
+        float s = glm::clamp(8.0f * h / t, 0.0f, 1.0f); // 计算遮挡因子
+        res = std::min(res, s);                        // 更新最小遮挡值
+        t += glm::clamp(h, 0.01f, 0.2f);               // 步进距离
+        if (res < 0.004f || t > tmax) break;           // 提前退出
+    }
+
+    // 返回柔化阴影值
+    res = glm::clamp(res, 0.0f, 1.0f);
+    return res * res * (3.0f - 2.0f * res);
 }
 
 /*---------------------------------------------------*/
@@ -187,33 +223,26 @@ float shape1(glm::vec3 p)
 {
     // union
     auto d = sdfSphere(p, cir, circle.w);
-    d = std::min(sdBox(p, {1,1,1}, {0, -4, 7}), d);
+    d = std::min(sdBox(p, {1,1,-1}, {0, -4, -7}), d);
     return d;
 }
 
 float shape2(glm::vec3 p)
 {
-    // intersection
-    auto d = sdfSphere(p, {5, -3, 6}, 1);
-    d = std::max(sdBox(p, {.5,5,.5}, {5, -3.5, 6}), d);
+//    auto d = sdfSphere(p, {0.01, 0.4, -0.4}, 0.2);
+//    d = std::max(sdBox(p, {.1,0.2,-.2}, {0.02, 0.25, -.38}), d);
+    auto d = sdBox(p, {.05,0.4,.03}, {-0.1, 0.2, -.38});
     return d;
 }
 
 float shape3(glm::vec3 p)
 {
-    // difference
-    auto d1 = sdfSphere(p, {-5, -3, 6}, 2);
-    auto d2 = sdBox(p, {1,1,2}, {-5, -3, 6});
-    auto d = std::max(d2 , -1 * d1);
+//    auto d1 = sdfSphere(p, {0.02, 0.3, 0.5}, 0.1);
+//    auto d2 = sdBox(p, {0.01,0.1,0.1}, {.1, .3, .3});
+//    auto d = std::max(d2 , -1 * d1);
+    auto d = sdBox(p, {0.01,0.1,0.1}, {.1, .3, .3});
     return d;
 }
-
-// quadratic polynomial
-//float smin( float a, float b, float k )
-//{
-//    float h = glm::clamp(0.5 + 0.5 * (b - a) / k, 0., 1.);
-//    return glm::mix(b, a, h) - k * h * (1. - h);
-//}
 
 glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
     if (a.x <= b.x)
@@ -229,9 +258,9 @@ glm::vec2 vec2Min(glm::vec2 a, glm::vec2 b) {
 
 glm::vec2 map(glm::vec3 p)
 {
-    auto d = glm::vec2(shape1(p), 2);
-    d = vec2Min(d, {shape2(p), 3});
-    d = vec2Min(d, {shape3(p), 4});
+    auto d = glm::vec2(sdfSphere(p, cir, circle.w), 22);
+    d = vec2Min(d, {shape2(p), 10});
+    d = vec2Min(d, {shape3(p), 2});
     d = vec2Min(d, mapSpecial(p));
     return d;
 //    return mapSpecial(p);
@@ -411,71 +440,122 @@ int w, h, channels;
 unsigned char* imageData = loadImage("E:\\c++_code\\rmRenderer\\channel\\1.jpg", w, h, channels);
 
 Color render(int x, int y, float iTime) {
-    // Step 1: Fix UV coordinates
     glm::vec2 uv = fixUV(x, y);
     myTime = iTime;
 
-    // Step 2: Generate random values
     // 加载图像
     glm::ivec2 texCoord(width, height); // 采样坐标
     glm::vec4 ran = texelFetch(imageData, width, height, texCoord);
 
     // glm::vec4 ran = generateRandom(static_cast<float>(x + y * 10000  + static_cast<int>(iTime * 10000)));
 
-    // Step 3: Camera setup
-    float an = 0.1f * iTime;
-    glm::vec3 ro = glm::vec3(0.4f * std::sin(an), 0.15f, 0.4f * std::cos(an));
+    float an = 1.f * iTime;
+    glm::vec3 ro = glm::vec3(.4f * std::sin(an), 0.15f, .4f * std::cos(an));
     glm::vec3 ta = glm::vec3(0.0f, 0.05f, 0.0f);
     glm::vec3 ww = glm::normalize(ta - ro);
     glm::vec3 uu = glm::normalize(glm::cross(ww, glm::vec3(0.0f, 1.0f, 0.0f)));
     glm::vec3 vv = glm::normalize(glm::cross(uu, ww));
     glm::vec3 rd = glm::normalize(uv.x * uu + uv.y * vv + 1.7f * ww);
 
+    // 拉远距离
+    ro = ro * glm::vec3(2.);
+
+//    cout << "ro: " << ro.x << " " << ro.y << " " << ro.z << endl;
+//    cout << "rd: " << rd.x << " " << rd.y << " " << rd.z << endl;
+
     // Step 4: Ray marching
     glm::vec3 col(1.0f);
     glm::vec2 res = intersect(ro, rd);
     float t = res.x;
     if (t > 0.0f) {
-        glm::vec3 pos = ro + t * rd;
-        glm::vec3 nor = calcNormal(pos);
-        glm::vec3 ref = glm::reflect(rd, nor);
-        float fre = glm::clamp(1.0f + glm::dot(nor, rd), 0.0f, 1.0f);
-        float occ = calcAO(pos, nor, ran.y); occ = occ * occ;
+        if (res.y < 1) {
+            glm::vec3 pos = ro + t * rd;
+            // debug
+//            cout << "pos: " << pos.x << " " << pos.y << " " << pos.z << endl;
 
-        // Blend materials
-        col = glm::mix(glm::vec3(0.0f, 0.05f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), res.y);
+            glm::vec3 nor = calcNormal(pos);
+            glm::vec3 ref = glm::reflect(rd, nor);
+            float fre = glm::clamp(1.0f + glm::dot(nor, rd), 0.0f, 1.0f);
+            float occ = calcAO(pos, nor, ran.y); occ = occ * occ;
 
-        col = col * 0.72f + 0.2f * fre * glm::vec3(1.0f, 0.8f, 0.2f);
-        glm::vec3 lin = 4.0f * glm::vec3(0.7f, 0.8f, 1.0f) * (0.5f + 0.5f * nor.y) * occ;
-        lin += 0.8f * glm::vec3(1.0f, 1.0f, 1.0f) * fre * (0.6f + 0.4f * occ);
-        col = col * lin;
-        col += 2.0f * glm::vec3(0.8f, 0.9f, 1.0f) * glm::smoothstep(0.0f, 0.4f, ref.y) *
-               (0.06f + 0.94f * std::pow(fre, 5.0f)) * occ;
-        col = glm::mix(col, glm::vec3(1.0f), 1.0f - std::exp2(-0.04f * t * t));
+            col = glm::mix(glm::vec3(0.0f, 0.05f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), res.y);
 
-//        if (std::abs(res.y - 1) < 0.1) {
-//            col += glm::vec3(0.23);
-//        }
-//        else if (std::abs(res.y - 2) < 0.1) {
-//            col += glm::vec3(1, 0, 0);
-//        }
-//        else if (std::abs(res.y - 3) < 0.1) {
-//            // 绿色
-//            col += glm::vec3(0.3, 0.3, 0.3);
-//        }
-//        else if (std::abs(res.y - 4) < 0.1) {
-//            col += glm::vec3(.6, 1, .2);
-//        }
+            col = col * 0.72f + 0.2f * fre * glm::vec3(1.0f, 0.8f, 0.2f);
+            glm::vec3 lin = 4.0f * glm::vec3(0.7f, 0.8f, 1.0f) * (0.5f + 0.5f * nor.y) * occ;
+            lin += 0.8f * glm::vec3(1.0f, 1.0f, 1.0f) * fre * (0.6f + 0.4f * occ);
+            col = col * lin;
+            col += 2.0f * glm::vec3(0.8f, 0.9f, 1.0f) * glm::smoothstep(0.0f, 0.4f, ref.y) *
+                   (0.06f + 0.94f * std::pow(fre, 5.0f)) * occ;
+            col = glm::mix(col, glm::vec3(1.0f), 1.0f - std::exp2(-0.04f * t * t));
+
+            col = glm::pow(col, glm::vec3(0.4545f));
+            col *= 0.9f;
+            col = glm::clamp(col, 0.0f, 1.0f);
+            col = col * col * (3.0f - 2.0f * col);
+
+            col += (ran.x - 0.5f) / 255.0f;
+        } else {
+            auto t = res.x;
+            // glm::vec3 col = glm::vec3(0.7, 0.7, 0.9) - glm::max(rd.y,0.0f)*glm::vec3(0.3);
+            col = glm::vec3(0.2) + glm::vec3(0.2) * sin(glm::vec3(res.y * 2.0) + glm::vec3(0.0, 1.0, 2.0));
+            float ks = 1.0;
+
+            glm::vec3 pos = ro + t*rd;
+            glm::vec3 nor = calcNormal( pos );
+            glm::vec3 ref = glm::reflect( rd, nor );
+
+            // 环境光遮蔽
+            float occ = calcAO(pos, nor);
+
+            // 初始化光照贡献
+            glm::vec3 lin(0.0f);
+
+            // 太阳光
+            {
+                glm::vec3 lig = glm::normalize(glm::vec3(-4.5f, 1.4f, 5.6f)); // 光源方向
+                glm::vec3 hal = glm::normalize(lig - rd);                     // 半角向量
+                float dif = glm::clamp(glm::dot(nor, lig), 0.0f, 1.0f);       // 漫反射
+                dif *= calcSoftshadow(pos, lig, 0.02f, 2.5f);                 // 柔化阴影
+                float spe = std::pow(glm::clamp(glm::dot(nor, hal), 0.0f, 1.0f), 16.0f); // 高光
+                spe *= dif; // 高光受漫反射影响
+                spe *= 0.04f + 0.96f * std::pow(glm::clamp(1.0f - glm::dot(hal, lig), 0.0f, 1.0f), 5.0f); // 高光衰减
+                lin += col * 2.20f * dif * glm::vec3(1.30f, 1.00f, 0.70f); // 漫反射贡献
+                lin += 5.00f * spe * glm::vec3(1.30f, 1.00f, 0.70f) * ks;  // 高光贡献
+            }
+
+            // 天空光
+            {
+                float dif = std::sqrt(glm::clamp(0.5f + 0.5f * nor.y, 0.0f, 1.0f)); // 天空漫反射
+                dif *= occ;                                                       // 环境光遮蔽
+                float spe = glm::smoothstep(-0.2f, 0.2f, ref.y);                  // 反射高光
+                spe *= dif;
+                spe *= 0.04f + 0.96f * std::pow(glm::clamp(1.0f + glm::dot(nor, rd), 0.0f, 1.0f), 5.0f); // 高光衰减
+                spe *= calcSoftshadow(pos, ref, 0.02f, 2.5f);                                           // 柔化反射阴影
+                lin += col * 0.60f * dif * glm::vec3(0.40f, 0.60f, 1.15f); // 天空漫反射贡献
+                lin += 2.00f * spe * glm::vec3(0.40f, 0.60f, 1.30f) * ks;  // 天空高光贡献
+            }
+
+            // 背光
+            {
+                float dif = glm::clamp(glm::dot(nor, glm::normalize(glm::vec3(0.5f, 0.0f, 0.6f))), 0.0f, 1.0f) *
+                            glm::clamp(1.0f - pos.y, 0.0f, 1.0f); // 背光漫反射
+                dif *= occ;                                      // 环境光遮蔽
+                lin += col * 0.55f * dif * glm::vec3(0.25f, 0.25f, 0.25f); // 背光贡献
+            }
+
+            // 次表面散射 (SSS)
+            {
+                float dif = std::pow(glm::clamp(1.0f + glm::dot(nor, rd), 0.0f, 1.0f), 2.0f); // SSS 强度
+                dif *= occ;                                                                 // 环境光遮蔽
+                lin += col * 0.25f * dif * glm::vec3(1.00f, 1.00f, 1.00f);                   // SSS 贡献
+            }
+
+            col = lin;
+
+            col = glm::mix( col, glm::vec3(0.7,0.7,0.9), 1.0-exp( -0.0001*t*t*t ) );
+        }
     }
 
-    // Step 5: Gamma correction and post-processing
-    col = glm::pow(col, glm::vec3(0.4545f));
-    col *= 0.9f;
-    col = glm::clamp(col, 0.0f, 1.0f);
-    col = col * col * (3.0f - 2.0f * col);
-
-    // Step 6: Dithering
-    col += (ran.x - 0.5f) / 255.0f;
 
     return fromVec(col);
 }

@@ -10,9 +10,12 @@
     # define REVERSE_Y
     # include "render3.hpp"
 # else
-# define REVERSE_Y
+    # define REVERSE_Y
+    # define USE_IMAGE_EXPORT
     # include "render.hpp"
 # endif
+
+std::string path = "E:\\c++_code\\rmRenderer\\picts2\\";
 
 void drawP(std::vector<Color> &pixels, int p, int tot, float iTime)
 {
@@ -26,9 +29,8 @@ int main(int argc, char **argv) {
     std::vector<Color> pixels(width * height);
 
 #ifdef USE_IMAGE_EXPORT
-    std::string path = "E:\\c++_code\\rmRenderer\\picts\\";
     int count = 0;
-    for (float iTime = 1.5; iTime <= 24.5 * 1000; iTime += 0.2) {
+    for (float iTime = 1.5; iTime <= 24.5 * 1000; iTime += 0.05) {
         std::thread a(drawP, std::ref(pixels), 0, 3, iTime);
         std::thread b(drawP, std::ref(pixels), 1, 3, iTime);
         std::thread c(drawP, std::ref(pixels), 2, 3, iTime);
@@ -70,13 +72,15 @@ int main(int argc, char **argv) {
         count += 1;
     }
 #else
-    std::thread a(drawP, std::ref(pixels), 0, 3, 1.5);
-    std::thread b(drawP, std::ref(pixels), 1, 3, 1.5);
-    std::thread c(drawP, std::ref(pixels), 2, 3, 1.5);
+    std::thread a(drawP, std::ref(pixels), 0, 4, 10.5);
+    std::thread b(drawP, std::ref(pixels), 1, 4, 10.5);
+    std::thread c(drawP, std::ref(pixels), 2, 4, 10.5);
+    std::thread d(drawP, std::ref(pixels), 3, 4, 10.5);
 
     a.join();
     b.join();
     c.join();
+    d.join();
 
 #ifdef REVERSE_Y
     // 上下反转
