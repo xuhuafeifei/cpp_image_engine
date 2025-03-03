@@ -222,7 +222,7 @@ float normalShadow(glm::vec3 p, glm::vec3 light)
     return 1;
 }
 
-Color render(int x, int y)
+Color render(int x, int y, float t)
 {
     glm::vec2 uv = fixUV(x, y);
 
