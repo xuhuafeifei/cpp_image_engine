@@ -6,12 +6,12 @@
 //#define MOUNTAIN_DRAW
 
 # ifdef MOUNTAIN_DRAW
-//    # define USE_IMAGE_EXPORT
+    # define USE_IMAGE_EXPORT
     # define REVERSE_Y
     # include "render3.hpp"
 # else
     # define REVERSE_Y
-    # define USE_IMAGE_EXPORT
+//    # define USE_IMAGE_EXPORT
     # include "render.hpp"
 # endif
 
