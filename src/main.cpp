@@ -4,6 +4,8 @@
 
 std::string path = "E:\\c++_code\\rmRenderer\\picts3\\";
 
+//#define EXPORT
+
 int main(int argc, char **argv)
 {
     std::vector<Color> pixels(width * height);
@@ -12,7 +14,7 @@ int main(int argc, char **argv)
             pixels[y * width + x] = render(x, y);
 
     // ✅ 保存为 PNG 图片
-    std::string filename = path + "kang_ju_chi.png";
+    std::string filename = path + "soft_shadow.png";
 
     InitWindow(width, height, "Render Result");
 
@@ -25,6 +27,7 @@ int main(int argc, char **argv)
         PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
     };
 
+#ifdef EXPORT
     Texture2D texture2 = LoadTextureFromImage(image);
 
     std::cout << filename << std::endl;
@@ -34,6 +37,7 @@ int main(int argc, char **argv)
     CloseWindow();
 
     return 0;
+#endif
 
     Texture2D texture = LoadTextureFromImage(image);
 

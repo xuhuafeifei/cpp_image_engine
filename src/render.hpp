@@ -76,6 +76,19 @@ float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt, float k )
     return res;
 }
 
+float softshadow( glm::vec3 ro, glm::vec3 rd, float mint, float maxt)
+{
+    float t = mint;
+    for( int i=0; i<256 && t<maxt; i++ )
+    {
+        float h = map(ro + rd*t);
+        if( h<0.001 )
+            return 0.0;
+        t += h;
+    }
+    return 1.0;
+}
+
 float rayMarch(glm::vec3 ro, glm::vec3 rd)
 {
     float t = tMin;
@@ -135,8 +148,9 @@ Color render(int x, int y)
             glm::normalize(light - p),
             n);
         // 绘制阴影
-        // diff *= normalShadow(p, light);
-        diff *= softshadow(p, glm::normalize(light - p), 0.1, 100, 5);
+//         diff *= normalShadow(p, light);
+        diff *= softshadow(p, glm::normalize(light - p), 0.1, 100, 32);
+//        diff *= softshadow(p, glm::normalize(light - p), 0.01, 100);
         // 增加环境光
         // float amb = 0.5 + 0.5 * dot(n, glm::vec3(0, 1, 0));
         // color = glm::vec3(1) * diff + amb * glm::vec3(0.5);
